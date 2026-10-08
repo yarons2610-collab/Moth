@@ -65,7 +65,7 @@ addRoute("map", "map", (id, focusPin) => {
   const years = DB.entries.flatMap(e => [e.start?.y, e.end?.y]).filter(y => y != null).concat(NOW().y);
   const minY = Math.min(...years), maxY = Math.max(...years, NOW().y);
   const trail = mapTrail(m);
-  const tools = [["pan", "✋", "Move around"], ["pin", "📍", "Drop a pin"], ["region", "⬠", "Draw a region"], ["party", "🛡", "Move the party"]];
+  const tools = [["pan", "✋", "Move", "Move around and tap things"], ["pin", "📍", "Pin", "Drop a pin"], ["region", "⬠", "Region", "Draw a region"], ["party", "🛡", "Party", "Move the party"]];
   const regions = m.regions.map(r => {
     const e = byId(DB.entries, r.entry), ep = epoch(e, year);
     if (ep === "future") return "";
@@ -79,12 +79,17 @@ addRoute("map", "map", (id, focusPin) => {
     return `<div class="pin ${ep} ${MAPV.sel?.pin === p.id ? "sel" : ""} ${p.map ? "has-map" : ""}" data-pin="${p.id}" style="left:${p.x * m.w}px;top:${p.y * m.h}px;--c:${e ? entryColor(e) : "#e3c27a"}">
       <div class="pin-in"><span class="pin-dot">${e ? kindOf(e).icon : p.map ? "🗺" : "•"}</span><span class="pin-label">${esc(label)}</span></div></div>`;
   }).join("");
-  const party = DB.party?.map === m.id ? `<div class="party-marker" style="left:${DB.party.x * m.w}px;top:${DB.party.y * m.h}px" title="The party"><div class="pin-in">🛡</div></div>` : "";
+  const regionLabels = m.regions.map(r => {
+    const e = byId(DB.entries, r.entry), ep = epoch(e, year), c = regionCenter(r);
+    return ep === "future" ? "" : `<div class="region-label ${ep}" style="left:${c.x * m.w}px;top:${c.y * m.h}px"><span>${esc(e ? e.name : r.label || "")}</span></div>`;
+  }).join("");
+  const party = DB.party?.map === m.id ? `<div class="party-marker" style="left:${DB.party.x * m.w}px;top:${DB.party.y * m.h}px" title="The party"><div class="pin-in">
+    <svg viewBox="0 0 24 28" width="26" height="30"><path d="M12 1 L22 5 V13 C22 20 17 25 12 27 C7 25 2 20 2 13 V5 Z" fill="#5fc9c4" stroke="#0b0a12" stroke-width="2"/><path d="M12 6 V22 M7 11 H17" stroke="#0b0a12" stroke-width="2"/></svg></div></div>` : "";
   return [`<div class="map-page ${MAPV.sel ? "with-side" : ""}">
     <div class="map-bar">
       <div class="crumbs">${trail.map(t => `<a href="#/map/${t.id}">${esc(t.name)}</a> › `).join("")}<b>${esc(m.name)}</b></div>
       <select data-change="mapJump" title="Go to another map">${DB.maps.map(x => `<option value="${x.id}" ${x === m ? "selected" : ""}>🗺 ${esc(x.name)}</option>`).join("")}</select>
-      <div class="tool-group">${tools.map(([t, i, l]) => `<button class="tool ${MAPV.tool === t ? "on" : ""}" data-act="mapTool" data-t="${t}" title="${l}">${i}<span>${l.split(" ").pop()}</span></button>`).join("")}</div>
+      <div class="tool-group">${tools.map(([t, i, l, tip]) => `<button class="tool ${MAPV.tool === t ? "on" : ""}" data-act="mapTool" data-t="${t}" title="${tip}">${i}<span>${l}</span></button>`).join("")}</div>
       ${MAPV.tool === "region" ? `<span class="hint">${MAPV.draft.length < 3 ? "Tap to add corners" : `<button class="btn small accent" data-act="finishRegion">Finish region</button>`} <button class="btn small ghost" data-act="cancelDraft">Cancel</button></span>` : ""}
       ${MAPV.movePin ? `<span class="hint">Tap where the pin should go <button class="btn small ghost" data-act="cancelMove">Cancel</button></span>` : ""}
       <div class="spacer"></div>
@@ -97,7 +102,7 @@ addRoute("map", "map", (id, focusPin) => {
     <div class="map-body">
       <div class="map-stage tool-${MAPV.tool}" id="mapStage">
         <div class="map-layer" id="mapLayer" style="width:${m.w}px;height:${m.h}px">${mapBg(m)}
-          <svg class="map-svg" viewBox="0 0 ${m.w} ${m.h}" width="${m.w}" height="${m.h}">${regions}${MAP_OVERLAYS.map(f => f(m)).join("")}${draft}</svg>${pins}${party}</div>
+          <svg class="map-svg" viewBox="0 0 ${m.w} ${m.h}" width="${m.w}" height="${m.h}">${regions}${MAP_OVERLAYS.map(f => f(m)).join("")}${draft}</svg>${regionLabels}${pins}${party}</div>
         <div class="zoom-btns"><button data-act="mapZoom" data-k="1.4">+</button><button data-act="mapZoom" data-k="0.7">−</button><button data-act="mapFit" title="Fit">⤢</button></div>
       </div>
       ${MAPV.sel ? `<aside class="map-side">${sidePanel(m)}</aside>` : ""}

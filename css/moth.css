@@ -297,6 +297,9 @@ body[data-route="map"] main { overflow: hidden; }
 .pin.gone { opacity: .4; filter: grayscale(.8); }
 /* party marker: its own rules, so pin styles can't override it */
 .party-marker .pin-in { transform: translate(-50%, -50%) scale(var(--ik)); transform-origin: 50% 50%; cursor: default; font-size: 26px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .7)); pointer-events: none; }
+.region-label { position: absolute; width: 0; height: 0; pointer-events: none; }
+.region-label span { position: absolute; transform: translate(-50%, -50%) scale(var(--ik)); font: italic 600 15px var(--serif); color: #2b2140; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 0 4px rgba(245, 235, 210, .9); }
+.region-label.gone { opacity: .4; }
 .zoom-btns { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
 .zoom-btns button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel); font-size: 17px; }
 .map-side { width: 330px; flex: none; border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 14px; position: relative; }
@@ -381,7 +384,8 @@ table.foes { width: 100%; border-collapse: collapse; }
 @media (max-width: 760px) {
   .top { flex-wrap: wrap; gap: 8px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); }
   .world-name { display: none; }
-  .tabs { order: 3; width: 100%; }
+  .tabs { order: 3; width: 100%; justify-content: space-between; }
+  .tab { padding: 6px 7px; font-size: 12.5px; }
   .page { padding: 14px 12px 80px; }
   .search { width: 100%; order: 5; }
   .entry-head { flex-wrap: wrap; }

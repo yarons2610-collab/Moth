@@ -99,6 +99,9 @@ async function pull({ quiet = false } = {}) {
 
 async function push() {
   if (!syncOn() || SYNC.busy) return;
+  // nothing changed here, so nothing to send (pushing anyway would bump the
+  // Gist's version and make the other device think there's a conflict)
+  if (!ls.get("dirty") && ls.get("id")) return setSync("ok", "Up to date");
   SYNC.busy = true;
   setSync("busy", "Saving to GitHub…");
   try {
@@ -172,7 +175,6 @@ on("saved", () => {
   ls.set("dirty", "1");
   if (syncOn()) { setSync("pending", "Changes not sent yet"); schedulePush(); }
 });
-on("assets", () => { if (syncOn() && !SYNC.applying) schedulePush(); });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pull(); });
 setInterval(() => { if (document.visibilityState === "visible" && !ls.get("dirty")) pull({ quiet: false }); }, 90000);
 

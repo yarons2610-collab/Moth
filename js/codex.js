@@ -30,6 +30,8 @@ function relTypeFromLabel(label) {
   return "";
 }
 const relType = r => r.type ?? relTypeFromLabel(r.label);
+// "A is rival of B", but "A lives in B" and "A has sworn to B": no "is" before a verb
+const relVerb = label => /^(is|was|has|had|owes)\b/i.test(label) || /^\w+s\b/i.test(label) && !/^\w+(ss|us|is)\b/i.test(label) ? "" : "is ";
 const REL_LABEL = { parent: "parent of", child: "child of", spouse: "spouse of", sibling: "sibling of" };
 function relsOf(e) {
   const out = (e.rels || []).map(r => ({ r, from: e, to: byId(DB.entries, r.to), own: true })).filter(x => x.to);
@@ -97,7 +99,7 @@ addRoute("e", "codex", id => {
   const relHtml = rels.map(({ r, from, to, own }) => {
     const t = relType(r);
     const lbl = r.label || REL_LABEL[t] || "related to";
-    return `<li>${from === e ? `<b>${esc(e.name)}</b>` : chip("e", from)} is <i>${esc(lbl)}</i> ${to === e ? `<b>${esc(e.name)}</b>` : chip("e", to)}
+    return `<li>${from === e ? `<b>${esc(e.name)}</b>` : chip("e", from)} ${relVerb(lbl)}<i>${esc(lbl)}</i> ${to === e ? `<b>${esc(e.name)}</b>` : chip("e", to)}
       ${t ? `<span class="fam-badge">${t}</span>` : ""}
       <span class="row-tools"><button class="mini" data-act="editRel" data-owner="${from.id}" data-rel="${r.id}" title="Edit">✎</button></span></li>`;
   }).join("");

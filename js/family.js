@@ -124,9 +124,9 @@ function treeSvg(focus) {
   }
   const boxes = nodes.map(n => {
     const e = byId(DB.entries, n.id), dead = e.end && dateKey(e.end) <= dateKey(NOW());
-    const span = [e.start ? fmtYear(e.start.y) : "", e.end ? fmtYear(e.end.y) : ""];
     const age = e.start ? ageAt(e.start, dead ? e.end : NOW()) : null;
-    const sub = (span[0] || span[1] ? (span[0] || "?") + " – " + (span[1] || "") : "") + (age != null && age >= 0 ? (span[0] ? " · " : "") + (dead ? "died at " : "age ") + age : "");
+    const span = e.start && e.end ? `${fmtYear(e.start.y)} – ${fmtYear(e.end.y)}` : e.start ? `b. ${fmtYear(e.start.y)}` : e.end ? `d. ${fmtYear(e.end.y)}` : "";
+    const sub = [span, age != null && age >= 0 ? (dead ? "died at " : "age ") + age : ""].filter(Boolean).join(" · ");
     return `<g class="t-node ${n.id === focus ? "focus" : ""} ${dead ? "dead" : ""}" data-id="${n.id}" transform="translate(${n.x - BOX_W / 2},${n.y - BOX_H / 2})" style="--c:${entryColor(e)}">
       <rect width="${BOX_W}" height="${BOX_H}" rx="10"/>
       <text x="12" y="23" class="t-name">${esc(e.name.length > 20 ? e.name.slice(0, 19) + "…" : e.name)}${dead ? " †" : ""}</text>

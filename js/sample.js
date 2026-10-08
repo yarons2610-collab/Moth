@@ -55,7 +55,7 @@ function sampleWorld() {
   rel("aldra", "teodric", "married to"); rel("corran", "aldra", "son of"); rel("corran", "teodric", "son of");
   rel("isel", "guild", "leads", ""); rel("maren", "weir", "lives in", ""); rel("jory", "gullwatch", "keeps the lamp at", "");
   rel("pell", "maren", "sweet on", ""); rel("aldra", "palace", "rules from", ""); rel("tidebound", "flood", "worships", "");
-  rel("kestrel", "gullwatch", "raised near", ""); rel("ansel", "gullwatch", "serves the saint of", "");
+  rel("kestrel", "gullwatch", "grew up near", ""); rel("ansel", "gullwatch", "serves the saint of", "");
   E.maren.fields[fid("character", "Home")] = E.weir.id;
   E.isel.fields[fid("character", "Title")] = "Guildmistress"; E.isel.fields[fid("character", "Allegiance")] = E.guild.id; E.isel.fields[fid("character", "Home")] = E.saltmere.id;
   E.aldra.fields[fid("character", "Title")] = "Queen of Lumen"; E.crown.fields[fid("item", "Owner")] = E.aldra.id;
@@ -105,7 +105,7 @@ function sampleWorld() {
       route: [{ map: city.id, x: 0.46, y: 0.7, place: E.weir.id, at: Date.now() - 864e6 }, { map: map.id, x: 0.71, y: 0.22, place: E.gullwatch.id, at: Date.now() - 863e6 }] },
     { id: uid(), num: 2, title: "Forty Fathoms", real: "2026-10-03", date: { y: AF(312), m: 5, d: 2 }, attendees: [E.kestrel.id, E.ansel.id], playing: true,
       prep: "- Jory breaks, or doesn't\n- The [[Tidebound]] make their offer\n- Roll on [[Saltmere rumours]] when they go back to town", recap: "", route: [] });
-  db.party = { map: map.id, x: 0.69, y: 0.25, place: E.gullwatch.id };
+  db.party = { map: map.id, x: 0.65, y: 0.3, place: E.gullwatch.id };
   db.quests.push(
     { id: uid(), title: "Watch the smuggler", status: "active", giver: E.isel.id, target: E.maren.id, body: "Find out what [[Maren Vey]] pulled out of the water. Report to the Guild house, not to Isel's man.", reward: "40 silver, and Isel's goodwill" },
     { id: uid(), title: "The throne room is dry", status: "open", giver: E.tamsin.id, target: E.palace.id, body: "[[Old Tamsin]] says someone has been lighting the lamps in [[The Sunken Palace]].", reward: "" });
