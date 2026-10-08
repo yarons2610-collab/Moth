@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1d79a"/><stop offset="1" stop-color="#b98f4e"/></linearGradient>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cdb98f"/><stop offset="1" stop-color="#8d6e3f"/></linearGradient>
+  </defs>
+  <!-- upper wings -->
+  <path d="M31 25 C24 13 10 9 4 14 C2 22 9 31 20 33 C25 33 29 30 31 27Z" fill="url(#w)"/>
+  <path d="M33 25 C40 13 54 9 60 14 C62 22 55 31 44 33 C39 33 35 30 33 27Z" fill="url(#w)"/>
+  <!-- lower wings -->
+  <path d="M31 30 C25 34 16 40 16 48 C20 53 28 47 31 38Z" fill="url(#h)"/>
+  <path d="M33 30 C39 34 48 40 48 48 C44 53 36 47 33 38Z" fill="url(#h)"/>
+  <!-- eye spots: the moon -->
+  <circle cx="16" cy="20" r="3.6" fill="#0b0a12"/><circle cx="16.8" cy="19.4" r="1.4" fill="#b9a6ff"/>
+  <circle cx="48" cy="20" r="3.6" fill="#0b0a12"/><circle cx="47.2" cy="19.4" r="1.4" fill="#b9a6ff"/>
+  <!-- body and antennae -->
+  <ellipse cx="32" cy="32" rx="2.6" ry="12" fill="#2a2238"/>
+  <path d="M31 21 C28 14 24 11 21 10 M33 21 C36 14 40 11 43 10" stroke="#2a2238" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+</svg>

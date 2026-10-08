@@ -1,0 +1,58 @@
+<!doctype html>
+<!-- Moth: a worldbuilding and fiction notebook that can also run the world at the table.
+     A plain static site: no build step, js/*.js load in the order below, and every
+     module registers itself with core.js (routes, link types, panels, hooks). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moth</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Moth">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon-32.png">
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="stylesheet" href="css/moth.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <a class="brand" href="#/codex"><img src="icons/moth.svg" alt=""><h1>Moth</h1><span class="world-name" id="worldName"></span></a>
+    <nav class="tabs" id="tabs">
+      <a class="tab" data-tab="codex" href="#/codex">Codex</a>
+      <a class="tab" data-tab="timeline" href="#/timeline">Timeline</a>
+      <a class="tab" data-tab="story" href="#/story">Story</a>
+      <a class="tab" data-tab="map" href="#/map">Map</a>
+      <a class="tab" data-tab="web" href="#/web">Web</a>
+      <a class="tab" data-tab="play" href="#/play">Play</a>
+      <a class="tab" data-tab="notes" href="#/notes">Notes</a>
+    </nav>
+    <div class="top-tools">
+      <button class="icon-btn" data-act="find" title="Find anything (Ctrl/⌘ K or /)">⌕</button>
+      <a class="icon-btn" href="#/settings" title="Settings and sync"><span class="sync-dot" id="syncDot"></span>⚙</a>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="toasts"></div>
+
+<script src="js/core.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/codex.js"></script>
+<script src="js/family.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/story.js"></script>
+<script src="js/map.js"></script>
+<script src="js/web.js"></script>
+<script src="js/play.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/find.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/sample.js"></script>
+<script src="js/boot.js"></script>
+</body>
+</html>
