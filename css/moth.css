@@ -399,6 +399,77 @@ table.foes { width: 100%; border-collapse: collapse; }
 .storage-bar i { display: block; height: 100%; background: var(--accent); }
 .storage-bar i.warn { background: var(--danger); }
 
+/* what the players can't see, as you see it */
+.token.secret { opacity: .45; }
+.token.secret .tok-face { border-style: dashed; }
+.fog path { fill: rgba(5, 4, 10, .55); }
+.fog.for-players path { fill: #000; }
+.battle-stage.tool-fog { cursor: cell; }
+.battle-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; min-height: 32px; }
+.battle-tools .check { margin: 0; }
+.sel-tools { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.pin.secret .pin-dot { border-style: dashed; opacity: .6; }
+.pin.secret .pin-label { opacity: .6; font-style: italic; }
+.region.secret { stroke-dasharray: 3 5; fill-opacity: .4; }
+.secret-note { color: var(--accent2); font-size: 12.5px; }
+.btn.live { border-color: var(--ok); color: #c7f0d8; background: color-mix(in srgb, var(--ok) 16%, var(--panel)); }
+.icon-btn.live { border-color: var(--ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 35%, transparent); }
+blockquote { position: relative; }
+.quote-show { position: absolute; right: -4px; top: -2px; opacity: .5; }
+blockquote:hover .quote-show, .quote-show:focus { opacity: 1; }
+.screen-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line2); margin-bottom: 8px; }
+.screen-status.live { border-color: var(--ok); }
+.screen-status .btn { margin-left: auto; }
+.screen-h { margin: 16px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.handouts { display: flex; gap: 10px; flex-wrap: wrap; }
+.handout { width: 120px; display: flex; flex-direction: column; gap: 3px; }
+.handout small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.handout-pic { width: 120px; height: 84px; padding: 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--line2); background: var(--bg2); }
+.handout-pic img { width: 100%; height: 100%; object-fit: cover; }
+.handout.add { height: 84px; border: 1px dashed var(--line2); border-radius: 8px; background: transparent; color: var(--ink-dim); }
+
+/* music */
+.music-dock { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); width: min(360px, calc(100% - 28px)); z-index: 40; background: var(--panel2); border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); overflow: hidden; }
+.md-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; font-size: 12.5px; }
+.md-head > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-tools { display: flex; gap: 4px; align-items: center; }
+.md-tools select { padding: 2px 4px; font-size: 12px; max-width: 130px; }
+.music-dock iframe { display: block; width: 100%; border: 0; }
+/* folded, the player stays loaded (so the music keeps playing), just out of sight */
+.music-dock.folded iframe { height: 0 !important; }
+body:has(.music-dock:not(.folded)) #toasts { bottom: 240px; }
+
+/* the player screen */
+body.player-mode { background: #000; cursor: default; }
+body.player-mode .top { display: none; }
+body.player-mode main { overflow: hidden; }
+.ps { position: fixed; inset: 0; background: #000; color: #f3eee2; display: flex; align-items: center; justify-content: center; }
+.ps-stage { position: absolute; inset: 0; overflow: hidden; }
+.ps-stage + .ps-init, .ps-stage ~ .ps-caption { position: absolute; }
+.ps .token { cursor: default; transition: left .4s, top .4s; }
+.ps .tok-name { display: none !important; }
+.ps .token.bloodied .tok-face { box-shadow: 0 0 0 4px #b3322a; }
+.ps-title { text-align: center; opacity: .85; }
+.ps-title img { width: 120px; height: 120px; }
+.ps-title h1 { font: 600 52px var(--serif); margin-top: 18px; letter-spacing: .02em; }
+.ps-card { text-align: center; max-width: 80vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.ps-pic { max-height: 70vh; max-width: 70vw; border-radius: 18px; box-shadow: 0 10px 50px rgba(0, 0, 0, .8); }
+.ps-card h1 { font: 600 56px var(--serif); }
+.ps-card p { font: 28px/1.4 var(--serif); margin: 0; color: #d7cfbd; max-width: 60vw; }
+.ps-handout { max-width: 94vw; max-height: 94vh; object-fit: contain; }
+.ps-text { max-width: min(1100px, 86vw); font: 38px/1.55 var(--serif); }
+.ps-text p { margin: 0 0 .6em; }
+.ps-caption { left: 50%; bottom: 24px; transform: translateX(-50%); font: 600 26px var(--serif); background: rgba(0, 0, 0, .6); padding: 4px 18px; border-radius: 8px; }
+.ps-init { left: 0; right: 0; bottom: 0; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 12px; background: linear-gradient(transparent, rgba(0, 0, 0, .85) 40%); font: 600 20px var(--disp); }
+.ps-round { color: var(--accent); margin-right: 8px; align-self: center; }
+.ps-who { background: rgba(30, 26, 45, .9); border: 2px solid #3a3456; border-radius: 10px; padding: 4px 12px; display: inline-flex; gap: 8px; align-items: baseline; }
+.ps-who small { font: 14px var(--mono); color: #b9b2cc; }
+.ps-who.pc { border-color: var(--accent2); }
+.ps-who.cur { border-color: var(--accent); box-shadow: 0 0 16px var(--accent); }
+.ps-who.down { opacity: .45; text-decoration: line-through; }
+.ps-hint { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(40, 36, 60, .9); color: #fff; padding: 6px 14px; border-radius: 8px; font-size: 14px; z-index: 5; pointer-events: none; }
+.ps-hint[hidden] { display: none; }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }

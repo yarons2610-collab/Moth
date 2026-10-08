@@ -294,6 +294,7 @@ addRoute("enc", "play", id => {
       <button class="btn accent" data-act="runEncounter" data-id="${x.id}">▶ Run</button>
       <button class="btn" data-act="editEncounter" data-id="${x.id}">Edit</button><button class="btn ghost" data-act="deleteEncounter" data-id="${x.id}">🗑</button></div>
     ${battlePanel(x)}
+    ${musicPanel(x)}
     <section class="panel"><div class="panel-h"><h4>Foes</h4><button class="btn small" data-act="addFoe" data-id="${x.id}">+ Foe</button></div>
       <table class="foes"><tr><th>Foe</th><th>×</th><th>HP</th><th>AC</th><th>Init</th><th></th></tr>
       ${(x.foes || []).map((f, i) => { const e = byId(DB.entries, f.entry), st = e?.stats || {}, sz = f.size || +st.size || 1; return `<tr><td>${e ? chip("e", e) : esc(f.name)}${sz !== 1 ? ` <small class="muted">${TOKEN_SIZES[sz] || sz + " squares"}</small>` : ""}</td><td>${f.count || 1}</td>
@@ -363,6 +364,8 @@ ACT.runEncounter = el => {
       list.sort((a, b) => b.init - a.init || b.mod - a.mod || (a.pc ? -1 : 1));
       DB.combat = { enc: x.id, round: 1, turn: 0, list, log: [`Combat begins: ${x.name}. Initiative: ${list.map(c => `${c.name} ${c.init}`).join(", ")}.`] };
       save();
+      if (x.music?.length && musicEmbed(x.music[0].url)) playMusic(x, 0);
+      if (x.battle && screenOpen()) showOnScreen({ kind: "battle", id: x.id });
       go("#/combat");
     } }] });
 };
@@ -385,6 +388,7 @@ addRoute("combat", "play", () => {
         <button class="mini dmg" data-act="cHp" data-i="${i}" data-s="-1">Hit</button><button class="mini" data-act="cHp" data-i="${i}" data-s="1">Heal</button>
         <button class="mini" data-act="cRemove" data-i="${i}" title="Remove from the fight">✕</button></div>
     </div>`).join("")}</div>
+    ${x?.music?.length ? musicPanel(x) : ""}
     <section class="panel"><div class="panel-h"><h4>Log</h4></div><ol class="combat-log">${c.log.slice().reverse().map(l => `<li>${esc(l)}</li>`).join("")}</ol></section></div></div></div>`, main => x && wireBattle(main, x)];
 });
 const clog = msg => DB.combat.log.push(`R${DB.combat.round}: ${msg}`);

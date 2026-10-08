@@ -3,6 +3,7 @@
    first visit opens on the sample world so there's something to explore. */
 
 (async () => {
+  if (PLAYER_MODE) return playerBoot();
   const had = loadDB();
   await loadAssets();
   if (!had) {

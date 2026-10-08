@@ -68,14 +68,14 @@ addRoute("map", "map", (id, focusPin) => {
   const regions = m.regions.map(r => {
     const e = byId(DB.entries, r.entry), ep = epoch(e, year);
     if (ep === "future") return "";
-    return `<polygon class="region ${ep} ${MAPV.sel?.region === r.id ? "sel" : ""}" data-region="${r.id}" points="${r.pts.map(p => p[0] * m.w + "," + p[1] * m.h).join(" ")}" style="--c:${r.color || (e ? entryColor(e) : "#e3c27a")}"/>`;
+    return `<polygon class="region ${ep} ${r.secret ? "secret" : ""} ${MAPV.sel?.region === r.id ? "sel" : ""}" data-region="${r.id}" points="${r.pts.map(p => p[0] * m.w + "," + p[1] * m.h).join(" ")}" style="--c:${r.color || (e ? entryColor(e) : "#e3c27a")}"/>`;
   }).join("");
   const draft = MAPV.draft.length ? `<polyline class="draft" points="${MAPV.draft.map(p => p[0] * m.w + "," + p[1] * m.h).join(" ")}"/>${MAPV.draft.map(p => `<circle class="draft-pt" cx="${p[0] * m.w}" cy="${p[1] * m.h}" r="5"/>`).join("")}` : "";
   const pins = m.pins.map(p => {
     const e = byId(DB.entries, p.entry), ep = epoch(e, year);
     if (ep === "future") return "";
     const label = e ? e.name : p.label || "Pin";
-    return `<div class="pin ${ep} ${MAPV.sel?.pin === p.id ? "sel" : ""} ${p.map ? "has-map" : ""}" data-pin="${p.id}" style="left:${p.x * m.w}px;top:${p.y * m.h}px;--c:${e ? entryColor(e) : "#e3c27a"}">
+    return `<div class="pin ${ep} ${p.secret ? "secret" : ""} ${MAPV.sel?.pin === p.id ? "sel" : ""} ${p.map ? "has-map" : ""}" data-pin="${p.id}" style="left:${p.x * m.w}px;top:${p.y * m.h}px;--c:${e ? entryColor(e) : "#e3c27a"}">
       <div class="pin-in"><span class="pin-dot">${e ? kindOf(e).icon : p.map ? "🗺" : "•"}</span><span class="pin-label">${esc(label)}</span></div></div>`;
   }).join("");
   const regionLabels = m.regions.map(r => {
@@ -92,6 +92,7 @@ addRoute("map", "map", (id, focusPin) => {
       ${MAPV.tool === "region" ? `<span class="hint">${MAPV.draft.length < 3 ? "Tap to add corners" : `<button class="btn small accent" data-act="finishRegion">Finish region</button>`} <button class="btn small ghost" data-act="cancelDraft">Cancel</button></span>` : ""}
       ${MAPV.movePin ? `<span class="hint">Tap where the pin should go <button class="btn small ghost" data-act="cancelMove">Cancel</button></span>` : ""}
       <div class="spacer"></div>
+      <button class="btn small ${screenIs("map", m.id) ? "live" : ""}" data-act="screenMap" data-id="${m.id}" title="Put this map on the player screen (secret pins stay hidden)">📺 ${screenIs("map", m.id) ? "On screen" : "Show players"}</button>
       <button class="btn small" data-act="mapMenu" data-id="${m.id}">⋯ Map</button>
     </div>
     <div class="map-years"><span>${esc(fmtYear(minY))}</span>
@@ -131,6 +132,8 @@ function sidePanel(m) {
     body = `<div class="side-head" style="--c:${entryColor(e)}">${e.portrait ? assetImg(e.portrait) : `<span class="side-icon">${kindOf(e).icon}</span>`}
         <div><h3><a href="#/e/${e.id}">${esc(e.name)}</a></h3><small>${esc(kindOf(e).name)}${lifespan(e) ? " · " + esc(lifespan(e)) : ""}</small></div></div>
       ${e.summary ? `<p>${inline(e.summary)}</p>` : ""}
+      ${thing.secret ? `<p class="secret-note">🙈 Hidden from the players</p>` : ""}
+      <button class="btn small" data-act="screenEntry" data-id="${e.id}">📺 Show players</button>
       ${child ? `<a class="btn accent wide" href="#/map/${child.id}">Open ${esc(child.name)} →</a>` : ""}
       ${sections.join("") || `<p class="muted">Nothing else is connected to ${esc(e.name)} yet.</p>`}`;
   } else {
@@ -263,6 +266,7 @@ function placeFields(thing, isPin, m) {
   return `${field("Codex entry", `<select name="entry">${entryOptions(thing.entry, { blank: "— none, or a new one below —" })}</select>`)}
     <div class="row2">${textField("…or create a new entry called", "newName", "")}${field("as a", `<select name="newKind">${kinds}</select>`)}</div>
     ${textField("Label (when it's not an entry)", "label", thing.label)}
+    <label class="check"><input type="checkbox" name="secret" ${thing.secret ? "checked" : ""}> Hidden from the players (not drawn on the player screen)</label>
     ${isPin ? field("Opens another map", `<select name="map"><option value="">—</option>${DB.maps.filter(x => x !== m).map(x => `<option value="${x.id}" ${x.id === thing.map ? "selected" : ""}>🗺 ${esc(x.name)}</option>`).join("")}<option value="__new">+ a new map…</option></select>`) : colorField("Colour", "color", thing.color)}`;
 }
 function readPlace(v, thing) {
@@ -272,6 +276,7 @@ function readPlace(v, thing) {
     thing.entry = e.id;
   } else thing.entry = v.entry;
   thing.label = v.label.trim();
+  thing.secret = v.secret;
 }
 function pinEditor(m, pin, isNew) {
   modal({ title: isNew ? "New pin" : "Edit pin", body: placeFields(pin, true, m),

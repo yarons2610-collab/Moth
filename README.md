@@ -8,9 +8,16 @@
 - **Map**: an uploaded image or blank parchment, with pins and regions tied to the codex, nested maps and a time slider.
 - **Web** of relationships, and **family trees**.
 - **Play**: the party, sessions, quests, encounters with an initiative tracker, dice and random tables.
+- **Battlemaps** for encounters, with tokens that snap to the grid, fog of war and hidden tokens.
+- **A player screen** for the TV: a second window that shows only what you send it (a battlemap through its fog, a map without secret pins, a picture, a handout, read-aloud text). Your own window keeps everything.
+- **Music**: Spotify, YouTube, SoundCloud or Apple Music playlists linked to encounters, played from a dock that stays put while you work.
 - `[[Wiki links]]` everywhere, with backlinks on every page. Find anything with `Ctrl/⌘ K` or `/`.
 
 It's a plain static site: no build step and no server. It works offline, can be installed on a phone, and keeps your world in your browser. To use it on more than one device, it can sync through a private GitHub Gist.
+
+## At the table
+
+Set the laptop's display to *extend* to the TV (not mirror), press 📺 and open the player screen, drag it onto the TV and click it once to go full screen. Anything with a 📺 button can be sent there; **Shift+B** blacks it out.
 
 ## Running it
 

@@ -14,7 +14,8 @@ const ls = {
   set: (k, v) => { try { v === "" || v == null ? localStorage.removeItem(SYNC_KEYS[k]) : localStorage.setItem(SYNC_KEYS[k], v); } catch {} },
 };
 const SYNC = { busy: false, applying: false, timer: null, state: "off", msg: "", last: 0 };
-const syncOn = () => !!ls.get("token");
+// the player screen never syncs: it only reads what your window saves
+const syncOn = () => !PLAYER_MODE && !!ls.get("token");
 
 function setSync(state, msg = "") {
   SYNC.state = state; SYNC.msg = msg;

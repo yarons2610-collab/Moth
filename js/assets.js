@@ -94,6 +94,7 @@ function usedAssets(db = DB) {
   for (const e of db.entries) { if (e.portrait) s.add(e.portrait); if (e.token) s.add(e.token); }
   for (const m of db.maps) if (m.asset) s.add(m.asset);
   for (const x of db.encounters) if (x.battle?.asset) s.add(x.battle.asset);
+  for (const h of db.handouts || []) if (h.asset) s.add(h.asset);
   return s;
 }
 // Images left over from deletes, once they're old enough not to be undone.

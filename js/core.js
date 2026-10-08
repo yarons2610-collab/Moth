@@ -17,6 +17,9 @@ const countWords = s => (String(s || "").match(/\S+/g) || []).length;
 const norm = s => String(s || "").trim().toLowerCase();
 const splitList = s => String(s || "").split(",").map(x => x.trim()).filter(Boolean);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// index.html?player is the player screen: a window for the TV that only shows
+// what you send it (see screen.js)
+const PLAYER_MODE = new URLSearchParams(location.search).has("player");
 const COLORS = ["#e3c27a", "#e07a5f", "#81b29a", "#7ea8f8", "#b9a6ff", "#f2a6c8", "#5fc9c4", "#a3a3b8"];
 
 /* ── hooks ── */
@@ -26,7 +29,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 
 /* ── data ── */
 const DB_KEY = "moth_db";
-const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables"];
+const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts"];
 let DB;
 
 function defaultKinds() {
@@ -204,7 +207,7 @@ function inline(raw) {
   x = x.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<i>$2</i>")
     .replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, "$1<i>$2</i>");
-  for (const hook of INLINE_HOOKS) x = hook(x);
+  if (!PLAYER_MODE) for (const hook of INLINE_HOOKS) x = hook(x);
   return x.replace(/\u0001(\d+)\u0001/g, (m, i) => stash[i]);
 }
 function md(src) {
@@ -212,7 +215,11 @@ function md(src) {
   let para = [], list = null, quote = [];
   const flushP = () => { if (para.length) out.push("<p>" + para.map(inline).join("<br>") + "</p>"); para = []; };
   const flushL = () => { if (list) out.push(`<${list.tag}>${list.items.map(i => "<li>" + inline(i) + "</li>").join("")}</${list.tag}>`); list = null; };
-  const flushQ = () => { if (quote.length) out.push("<blockquote>" + quote.map(inline).join("<br>") + "</blockquote>"); quote = []; };
+  // a quote is read-aloud text: you can put it on the player screen
+  const flushQ = () => {
+    if (quote.length) out.push(`<blockquote>${PLAYER_MODE ? "" : `<button class="mini quote-show" data-act="screenQuote" data-text="${esc(quote.join("\n"))}" title="Show on the player screen">📺</button>`}${quote.map(inline).join("<br>")}</blockquote>`);
+    quote = [];
+  };
   const flush = () => { flushP(); flushL(); flushQ(); };
   for (const raw of String(src || "").replace(/\r/g, "").split("\n")) {
     const l = raw.trimEnd();
