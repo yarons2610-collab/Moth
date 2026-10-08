@@ -63,6 +63,35 @@ function sampleWorld() {
   E.guild.fields[fid("faction", "Leader")] = E.isel.id; E.guild.fields[fid("faction", "Seat")] = E.saltmere.id;
   E.lumen.fields[fid("place", "Ruler")] = E.aldra.id;
   E.drowned.fields[fid("creature", "Habitat")] = "Tidal flats, wrecks, the Weir at low tide";
+  const fill = (key, kind, o) => { for (const [name, v] of Object.entries(o)) E[key].fields[fid(kind, name)] = v; };
+  fill("maren", "character", {
+    Pronouns: "she/her", Species: "Human", Occupation: "Smuggler", Status: "Alive", Birthplace: E.weir.id,
+    Height: "Short", Build: "Wiry, a swimmer's shoulders", Eyes: "Grey-green", Hair: "Black, cropped short", "Distinguishing features": "A rope scar round her left wrist",
+    "Clothing and look": "Oilskin coat two sizes too big (it was her mother's), bare feet on the boat, boots everywhere else.",
+    Traits: "Quick\nStubborn\nFunny when she's frightened", Ideals: "Debts get paid. Hers, and other people's.", Bonds: "[[Jory Vey]], always.", Flaws: "Trusts the sea more than people, and says so.",
+    Fears: "Deep water at night", Mannerisms: "Counts things under her breath", "Voice and speech": "Weir dialect; drops it when she wants something",
+    Quotes: "“The sea gives back. It just doesn't say when.”\n“I don't steal. I find things first.”",
+    Upbringing: "Raised on a diving boat by [[Brisa Vey]], who taught her to hold her breath for three minutes before she could read.",
+    Skills: "Free-diving\nSmall boats\nLying to collectors", Possessions: [E.crown.id], Weaknesses: "Owes [[Isel Tarrow]] more than she can pay",
+    Role: "Protagonist", Wants: "To be out from under Isel's debt.", Needs: "To stop carrying everything alone.", Arc: "From someone who keeps everything to herself, to someone who can ask for help.", Theme: "What we owe, and to whom",
+    Secrets: "She has the crown. She has worn it once, and heard the water remember her name.",
+  });
+  fill("isel", "character", {
+    Pronouns: "she/her", Species: "Human", Occupation: "Moneylender, guildmistress", Status: "Alive",
+    Eyes: "Pale brown", Hair: "Silver, braided tight", "Clothing and look": "Grey wool, good boots, a single pearl earring.",
+    Traits: "Patient\nPrecise\nNever raises her voice", Ideals: "Order is a kindness.", Flaws: "Believes everyone has a price, including herself.",
+    Role: "Antagonist", Wants: "The crown.", Secrets: "She doesn't want the crown for the Guild. She wants it for the [[Tidebound]].", "What they'd never admit": "She loved [[Brisa Vey]].",
+  });
+  fill("saltmere", "place", {
+    Status: "Thriving", Climate: "Cold, wet, windy", Terrain: "Steep hillside down to a tidal harbour", Landmarks: "The Weir\nGullwatch lamp\nThe Guild house steps",
+    Government: "A council, in name; the [[Saltward Guild]], in fact", "Factions here": [E.guild.id, E.tidebound.id], Economy: "Salvage, fishing, and debt.",
+    Exports: "Salt fish\nSalvaged Old Kingdom goods", Religion: "The lighthouse saint", "Culture and customs": "Nobody whistles on the water. Everyone leaves a coin on the Weir steps at the first low tide of the year.",
+    Sights: "Grey roofs stepping down to green water", Sounds: "Gulls, bells, the tide through the gates", Smells: "Salt, tar, fish", Mood: "Busy, damp, watchful",
+    Rumours: "There are rooms under the Guild house that flood at high tide.", Secrets: "The Guild house is built on the old palace's watchtower.", "Plot hooks": "A Guild ledger page washes up with Maren's name on it.",
+  });
+  fill("guild", "faction", { Type: "Guild", Size: "About 300 members", Symbol: "A hook and a scale", Motto: "What the sea takes, we recover.", Goals: "Keep Saltmere solvent, and in debt to the Guild.", Ranks: "Collector\nFactor\nMaster\nGuildmistress", "Notable members": [E.isel.id], Enemies: [E.tidebound.id], "Hidden agenda": "Half the masters want the Old Kingdom's treasury, not its return." });
+  fill("crown", "item", { Type: "Relic", Rarity: "Unique", Material: "Sea-pearl and pale gold", Appearance: "A plain circlet, cold to the touch even in summer.", Properties: "The wearer can breathe underwater, and hears voices in the tide.", "True nature": "It doesn't remember the wearer. It remembers the Old Kingdom, and wants it back." });
+  fill("drowned", "creature", { Type: "Undead", Size: "Medium", Danger: "Moderate", Appearance: "Swollen, pale, wearing whatever they drowned in.", Behaviour: "They walk inland at low tide, looking for home, and drag the living back with them.", Weaknesses: "Fire\nFresh water", Secrets: "They are all walking toward the Sunken Palace." });
 
   const ev = (title, date, involves, body = "", p = {}) => db.events.push({ id: uid(), title, date, end: null, involves: involves.map(k => E[k].id), body, tags: [], color: "", ...p });
   ev("Old Lumen is founded", { y: OK(212) }, ["lumen"], "Fishing towns on the hills above the bay become one city.");

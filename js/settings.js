@@ -2,7 +2,6 @@
 /* ── settings ── the world's name and calendar, kinds of codex entry and their
    fields, sync, export and import. */
 
-const FIELD_TYPES = { text: "Short text", long: "Long text", number: "Number", date: "World date", link: "Link to an entry" };
 
 addRoute("settings", "", () => {
   const w = DB.world;
@@ -19,7 +18,7 @@ addRoute("settings", "", () => {
 
     <section class="panel"><div class="panel-h"><h4>Kinds of entry</h4><button class="btn small" data-act="editKind" data-id="">+ Kind</button></div>
       <ul class="kind-list">${DB.kinds.map(k => `<li style="--c:${k.color}"><span class="k-ic">${k.icon}</span><b>${esc(k.name)}</b>
-        <small class="muted">${k.fields.map(f => esc(f.name)).join(", ") || "no extra fields"}</small><span class="spacer"></span>
+        <small class="muted">${k.fields.length ? `${plural(k.fields.length, "field")}${fieldSections(k.fields).length > 1 ? ` in ${fieldSections(k.fields).length} sections` : ""}` : "no fields"}</small><span class="spacer"></span>
         <button class="btn small" data-act="editKind" data-id="${k.id}">Edit</button></li>`).join("")}</ul></section>
 
     <section class="panel"><div class="panel-h"><h4>Sync between devices</h4><span class="sync-state ${SYNC.state}">${esc(syncLabel())}</span></div>
@@ -110,15 +109,43 @@ ACT.editCalendar = () => modal({ title: "Calendar", wide: true,
     commit();
   } }] });
 
+// one row of the field editor
+function kfRow(f) {
+  return `<div class="kf-row" data-id="${f.id || ""}">
+    <input class="kf-sec" list="kfSecs" value="${esc(f.sec || "")}" placeholder="Section" title="Section (blank: the basics, beside the article)">
+    <input class="kf-name" value="${esc(f.name || "")}" placeholder="Field name">
+    <select class="kf-type" data-change="kfType">${Object.entries(FIELD_TYPES).map(([t, l]) => `<option value="${t}" ${t === (f.type || "text") ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <input class="kf-opts" value="${esc((f.opts || []).join(", "))}" placeholder="Choices, with commas" ${f.type === "choice" ? "" : "hidden"}>
+    <label class="kf-secret" title="Secret: only you see it; never on the player screen"><input type="checkbox" ${f.secret ? "checked" : ""}>🙈</label>
+    <span class="kf-tools"><button type="button" class="mini" data-act="kfMove" data-d="-1" title="Up">↑</button><button type="button" class="mini" data-act="kfMove" data-d="1" title="Down">↓</button><button type="button" class="mini" data-act="kfDel" title="Remove">✕</button></span>
+  </div>`;
+}
+ACT.kfType = el => { el.parentElement.querySelector(".kf-opts").hidden = el.value !== "choice"; };
+ACT.kfMove = el => { const r = el.closest(".kf-row"), d = +el.dataset.d; d < 0 ? r.previousElementSibling?.before(r) : r.nextElementSibling?.after(r); };
+ACT.kfDel = el => el.closest(".kf-row").remove();
+ACT.kfAdd = el => { $("#kfList").insertAdjacentHTML("beforeend", kfRow({ sec: $$("#kfList .kf-sec").pop()?.value || "" })); $$("#kfList .kf-name").pop().focus(); };
+ACT.kfSuggest = el => {
+  const have = new Set($$("#kfList .kf-name").map(i => norm(i.value)));
+  const k = byId(DB.kinds, el.dataset.id), gone = new Map((k?.gone || []).map(f => [norm(f.name), f.id]));
+  const add = templateFields(el.dataset.id).filter(f => !have.has(norm(f.name))).map(f => ({ ...f, id: gone.get(norm(f.name)) || "" }));
+  $("#kfList").insertAdjacentHTML("beforeend", add.map(kfRow).join(""));
+  toast(add.length ? `Added ${plural(add.length, "suggested field")}. Save to keep them.` : "It already has all the suggested fields.");
+};
 ACT.editKind = el => {
   const isNew = !el.dataset.id;
   const k = isNew ? { id: "", name: "", icon: "◆", color: COLORS[DB.kinds.length % COLORS.length], startLabel: "From", endLabel: "Until", fields: [] } : byId(DB.kinds, el.dataset.id);
   const used = DB.entries.filter(e => e.kind === k.id).length;
+  const secs = [...new Set(DB.kinds.flatMap(x => x.fields.map(f => f.sec)).filter(Boolean))];
   modal({ title: isNew ? "New kind of entry" : "Edit " + k.name, wide: true,
     body: `<div class="row3">${textField("Name", "name", k.name, "autofocus")}${textField("Icon (an emoji)", "icon", k.icon)}${field("Colour", `<input type="color" name="color" value="${k.color}">`)}</div>
       <div class="row2">${textField("Start date is called", "startLabel", k.startLabel)}${textField("End date is called", "endLabel", k.endLabel)}</div>
-      ${areaField("Extra fields, one per line: name : type (" + Object.keys(FIELD_TYPES).join(", ") + ")", "fields", k.fields.map(f => `${f.name} : ${f.type}`).join("\n"), 5)}
-      ${!isNew ? `<p class="muted">${plural(used, "entry")} of this kind. Renaming a field keeps its values; removing one drops them.</p>` : ""}`,
+      <h4 class="screen-h">Fields</h4>
+      <p class="muted small">Fields with the same section are shown together; ones with no section sit beside the article. 🙈 marks a secret: only you see it, and it never goes on the player screen. Empty fields don't show on an entry's page.</p>
+      <datalist id="kfSecs">${secs.map(x => `<option value="${esc(x)}">`).join("")}</datalist>
+      <div class="kf-list" id="kfList">${k.fields.map(kfRow).join("")}</div>
+      <div class="btn-row"><button type="button" class="btn small" data-act="kfAdd">+ Field</button>
+        ${KIND_TEMPLATES[k.id] ? `<button type="button" class="btn small" data-act="kfSuggest" data-id="${k.id}">Add the suggested fields</button>` : ""}</div>
+      ${!isNew ? `<p class="muted small">${plural(used, "entry")} of this kind. Renaming a field keeps what's in it; removing one hides it (put it back with the same name to see it again).</p>` : ""}`,
     buttons: [
       ...(!isNew ? [{ label: "Delete kind", cls: "danger", act: () => {
         if (used) { toast(`${plural(used, "entry")} still use this kind. Change their kind first.`); return false; }
@@ -128,11 +155,21 @@ ACT.editKind = el => {
       { label: "Save", cls: "accent", act: w => {
         const v = formVals(w);
         if (!v.name.trim()) { toast("Give it a name"); return false; }
-        const lines = v.fields.split("\n").map(l => l.split(":").map(s => s.trim())).filter(p => p[0]);
-        const bad = lines.find(p => p[1] && !FIELD_TYPES[p[1].toLowerCase()]);
-        if (bad) { toast(`“${bad[1]}” isn't a field type. Use one of: ${Object.keys(FIELD_TYPES).join(", ")}`); return false; }
-        // fields keep their ids by position, so renaming one keeps its values
-        k.fields = lines.map((p, i) => ({ id: k.fields[i]?.id || uid(), name: p[0], type: (p[1] || "text").toLowerCase() }));
+        // a removed field that comes back by name gets its old id, and so its
+        // values: removed fields are remembered (k.gone) for exactly that
+        const byName = new Map([...(k.gone || []), ...k.fields].map(f => [norm(f.name), f.id]));
+        const before = k.fields;
+        k.fields = $$(".kf-row", w).map(r => {
+          const name = $(".kf-name", r).value.trim(), type = $(".kf-type", r).value;
+          if (!name) return null;
+          const f = { id: r.dataset.id || byName.get(norm(name)) || uid(), name, type, sec: $(".kf-sec", r).value.trim() };
+          if (type === "choice") f.opts = splitList($(".kf-opts", r).value);
+          if ($(".kf-secret input", r).checked) f.secret = true;
+          return f;
+        }).filter(Boolean);
+        const kept = new Set(k.fields.map(f => f.id));
+        const gone = [...(k.gone || []), ...before.filter(f => !kept.has(f.id)).map(f => ({ id: f.id, name: f.name }))];
+        k.gone = [...new Map(gone.filter(f => !kept.has(f.id)).map(f => [norm(f.name), f])).values()];
         Object.assign(k, { name: v.name.trim(), icon: v.icon.trim() || "◆", color: v.color, startLabel: v.startLabel.trim() || "From", endLabel: v.endLabel.trim() || "Until" });
         if (isNew) { k.id = fileSlug(k.name) + "-" + uid().slice(0, 4); DB.kinds.push(k); }
         commit();

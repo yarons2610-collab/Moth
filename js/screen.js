@@ -100,8 +100,14 @@ ACT.screenEntry = el => {
   modal({ title: `Show ${e.name} to the players`,
     body: `<label class="check"><input type="checkbox" name="pic" ${e.portrait || e.token ? "checked" : "disabled"}> Picture${e.portrait || e.token ? "" : " (none yet)"}</label>
       <label class="check"><input type="checkbox" name="name" checked> Name</label>
-      <label class="check"><input type="checkbox" name="summary" ${e.summary ? "" : "disabled"}> The one-line summary${e.summary ? `: <i>${esc(e.summary)}</i>` : ""}</label>`,
-    buttons: [{ label: "Cancel" }, { label: "📺 Show", cls: "accent", act: w => { const v = formVals(w); showOnScreen({ kind: "entry", id: e.id, pic: v.pic, name: v.name, summary: v.summary }); } }] });
+      <label class="check"><input type="checkbox" name="summary" ${e.summary ? "" : "disabled"}> The one-line summary${e.summary ? `: <i>${esc(e.summary)}</i>` : ""}</label>
+      ${publicFields(e).length ? `<h4 class="screen-h">Details to show</h4><div class="detail-picks">${publicFields(e).map(f =>
+        `<label class="check"><input type="checkbox" name="d_${f.id}" ${!f.sec || /appearance/i.test(f.sec) ? (SHORT.has(f.type) || /appearance/i.test(f.sec) ? "checked" : "") : ""}> ${esc(f.name)}</label>`).join("")}</div>
+        <p class="muted small">Fields marked 🙈 secret are never offered.</p>` : ""}`,
+    buttons: [{ label: "Cancel" }, { label: "📺 Show", cls: "accent", act: w => {
+      const v = formVals(w);
+      showOnScreen({ kind: "entry", id: e.id, pic: v.pic, name: v.name, summary: v.summary, fields: publicFields(e).filter(f => v["d_" + f.id]).map(f => f.id) });
+    } }] });
 };
 ACT.handoutAdd = async () => {
   const img = await pickImage(2400);
@@ -117,6 +123,23 @@ ACT.handoutDelete = el => {
   MODALS.forEach(m => m.close());
   ACT.screenPanel();
 };
+
+// the fields of an entry the players may see: filled in, and not secret
+const publicFields = e => kindOf(e).fields.filter(f => !f.secret && !isEmptyVal(e.fields?.[f.id]));
+function playerDetails(e, ids) {
+  const fs = publicFields(e).filter(f => ids.includes(f.id));
+  if (!fs.length) return "";
+  // links show as plain names on the TV, and long text is kept short
+  const show = f => {
+    const v = e.fields[f.id];
+    if (f.type === "link" || f.type === "links") return esc(fieldLinks(f, v).map(id => byId(DB.entries, id)?.name).filter(Boolean).join(", "));
+    if (f.type === "long" || f.type === "list") { const t = plainLinks(v).replace(/\n+/g, f.type === "list" ? " · " : " "); return esc(t.length > 300 ? t.slice(0, 300) + "…" : t); }
+    if (f.type === "date") return esc(fmtDate(v));
+    if (f.type === "yesno") return v ? "Yes" : "No";
+    return esc(plainLinks(String(v)));
+  };
+  return `<div class="ps-details">${fs.map(f => `<div><span>${esc(f.name)}</span><b>${show(f)}</b></div>`).join("")}</div>`;
+}
 
 /* ── the player screen's own side ── */
 function renderPlayer() {
@@ -134,7 +157,8 @@ function renderPlayer() {
     fit = m;
   } else if (s.kind === "entry" && byId(DB.entries, s.id)) {
     const e = byId(DB.entries, s.id), pic = e.portrait || e.token;
-    html = `<div class="ps-card">${s.pic && pic ? assetImg(pic, "ps-pic") : ""}${s.name ? `<h1>${esc(e.name)}</h1>` : ""}${s.summary && e.summary ? `<p>${esc(plainLinks(e.summary))}</p>` : ""}</div>`;
+    const details = s.fields?.length ? playerDetails(e, s.fields) : "";
+    html = `<div class="ps-card ${details ? "with-details" : ""}">${s.pic && pic ? assetImg(pic, "ps-pic") : ""}<div>${s.name ? `<h1>${esc(e.name)}</h1>` : ""}${s.summary && e.summary ? `<p>${esc(plainLinks(e.summary))}</p>` : ""}${details}</div></div>`;
   } else if (s.kind === "handout" && byId(DB.handouts, s.id)) {
     html = `<div class="ps-card handout-show">${assetImg(byId(DB.handouts, s.id).asset, "ps-handout")}</div>`;
   } else if (s.kind === "text") {

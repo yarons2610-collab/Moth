@@ -10,10 +10,10 @@ linkType("e", {
   names: e => [e.name, ...(e.aliases || [])],
   info: e => ({ title: e.name, sub: kindOf(e).name, icon: kindOf(e).icon, color: entryColor(e) }),
   href: e => "#/e/" + e.id,
-  text: e => [e.summary, e.body, ...kindOf(e).fields.filter(f => f.type === "text" || f.type === "long").map(f => e.fields?.[f.id])].join("\n"),
+  text: e => [e.summary, e.body, ...kindOf(e).fields.map(f => fieldText(f, e.fields?.[f.id])), ...(e.extra || []).map(x => x.name + " " + x.value)].join("\n"),
   edges: e => [
     ...(e.rels || []).map(r => ["e", r.to, r.label || "related"]),
-    ...kindOf(e).fields.filter(f => f.type === "link" && e.fields?.[f.id]).map(f => ["e", e.fields[f.id], f.name]),
+    ...kindOf(e).fields.flatMap(f => fieldLinks(f, e.fields?.[f.id]).map(id => ["e", id, f.name])),
   ],
 });
 
@@ -89,12 +89,22 @@ addRoute("e", "codex", id => {
   const e = byId(DB.entries, id);
   if (!e) return `<div class="page">${empty("That entry doesn't exist any more.")}</div>`;
   const k = kindOf(e);
-  const fields = k.fields.filter(f => e.fields?.[f.id] != null && e.fields[f.id] !== "").map(f => {
-    const v = e.fields[f.id];
-    const shown = f.type === "link" ? (byId(DB.entries, v) ? chip("e", byId(DB.entries, v)) : "—")
-      : f.type === "date" ? esc(fmtDate(v)) : f.type === "long" ? md(v) : inline(String(v));
-    return `<div class="kv"><span>${esc(f.name)}</span><div>${shown}</div></div>`;
-  }).join("");
+  // the untitled section (the basics) goes beside the article, the rest below it
+  const filled = f => !isEmptyVal(e.fields?.[f.id]);
+  const kv = f => `<div class="kv ${f.secret ? "secret-field" : ""}"><span>${f.secret ? "🙈 " : ""}${esc(f.name)}</span><div>${fieldShow(f, e.fields[f.id])}</div></div>`;
+  const secs = fieldSections(k.fields);
+  const basics = (secs.find(([s]) => s === "")?.[1] || []).filter(filled);
+  const emptyCount = k.fields.filter(f => !filled(f)).length;
+  const sections = secs.filter(([s]) => s).map(([s, fs]) => {
+    const got = fs.filter(filled);
+    if (!got.length) return "";
+    const short = got.filter(f => SHORT.has(f.type)), long = got.filter(f => !SHORT.has(f.type));
+    return `<section class="panel field-sec"><div class="panel-h"><h4>${esc(s)}</h4></div>
+      ${short.length ? `<div class="kvs grid2">${short.map(kv).join("")}</div>` : ""}
+      ${long.map(f => `<div class="field-block ${f.secret ? "secret-field" : ""}"><h5>${f.secret ? "🙈 " : ""}${esc(f.name)}</h5>${fieldShow(f, e.fields[f.id])}</div>`).join("")}</section>`;
+  }).join("") + ((e.extra || []).length ? `<section class="panel field-sec"><div class="panel-h"><h4>More</h4></div>
+    ${e.extra.map(x => `<div class="field-block"><h5>${esc(x.name)}</h5><div class="prose">${md(x.value)}</div></div>`).join("")}</section>` : "");
+  const fields = basics.map(kv).join("");
   const rels = relsOf(e);
   const relHtml = rels.map(({ r, from, to, own }) => {
     const t = relType(r);
@@ -125,13 +135,15 @@ addRoute("e", "codex", id => {
     <div class="entry-grid">
       <div class="col-main">
         ${mdBlock(e.body, `<p class="empty">No article yet. <a data-act="editEntry" data-id="${e.id}">Write one</a>, using [[Name]] to link.</p>`)}
+        ${sections}
         <section class="panel"><div class="panel-h"><h4>Relationships</h4><button class="btn small" data-act="addRel" data-id="${e.id}">+ Add</button></div>
           ${relHtml ? `<ul class="rels">${relHtml}</ul>` : empty("No relationships yet.")}</section>
         ${panels}
         ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it, b.label !== "mentions" ? ` <small>${esc(b.label)}</small>` : "")).join("")}</div></section>` : ""}
       </div>
       <div class="col-side">
-        ${fields ? `<section class="panel"><div class="kvs">${fields}</div></section>` : ""}
+        <section class="panel">${fields ? `<div class="kvs">${fields}</div>` : ""}
+          ${emptyCount ? `<a class="fill-hint" data-act="editEntry" data-id="${e.id}">${fields ? "+ " : ""}${plural(emptyCount, "detail")} to fill in</a>` : ""}</section>
         ${statBlock(e)}
       </div>
     </div>
@@ -159,15 +171,17 @@ function statBlock(e) {
 /* ── editing ── */
 function kindFieldsHtml(kind, e) {
   const k = byId(DB.kinds, kind) || kindOf(null);
+  // each section folds away; one with something in it starts open
   return `<div class="row2">${dateField(esc(k.startLabel || "From"), "start", e.start)}${dateField(esc(k.endLabel || "Until"), "end", e.end)}</div>
-    ${k.fields.length ? `<div class="row2">${k.fields.map(f => {
-      const v = e.fields?.[f.id] ?? "", n = "f_" + f.id;
-      if (f.type === "link") return field(esc(f.name), `<select name="${n}">${entryOptions(v)}</select>`);
-      if (f.type === "date") return dateField(esc(f.name), n, v || null);
-      if (f.type === "long") return areaField(esc(f.name), n, v, 3, `class="span2"`);
-      return textField(esc(f.name), n, v, f.type === "number" ? `type="number" step="any"` : "");
-    }).join("")}</div>` : ""}`;
+    ${fieldSections(k.fields).map(([sec, fs], i) => {
+      const n = fs.filter(f => !isEmptyVal(e.fields?.[f.id])).length;
+      return `<details class="field-ed" ${i === 0 || n ? "open" : ""}><summary>${esc(sec || "Details")} <small>${n ? `${n} of ${fs.length} filled` : plural(fs.length, "field")}</small></summary>
+        <div class="row2">${fs.map(f => fieldInput(f, e.fields?.[f.id])).join("")}</div></details>`;
+    }).join("")}`;
 }
+const extraRow = (x = { name: "", value: "" }) => `<div class="extra-row"><input class="x-name" placeholder="Field" value="${esc(x.name)}"><textarea class="x-value" rows="2" placeholder="What it says">${esc(x.value)}</textarea><button type="button" class="mini" data-act="extraDel" title="Remove">✕</button></div>`;
+ACT.extraAdd = el => el.insertAdjacentHTML("beforebegin", extraRow());
+ACT.extraDel = el => el.closest(".extra-row").remove();
 function entryEditor(e, isNew) {
   const s = e.stats || {};
   modal({
@@ -177,6 +191,8 @@ function entryEditor(e, isNew) {
       ${textField("One-line summary", "summary", e.summary, "data-links")}
       <div class="row2">${textField("Also known as (commas between)", "aliases", (e.aliases || []).join(", "))}${textField("Tags (commas between)", "tags", (e.tags || []).join(", "))}</div>
       <div id="kindFields">${kindFieldsHtml(e.kind, e)}</div>
+      <details class="field-ed" ${(e.extra || []).length ? "open" : ""}><summary>Fields of its own <small>just for this entry</small></summary>
+        <div class="extras">${(e.extra || []).map(extraRow).join("")}<button type="button" class="btn small" data-act="extraAdd">+ Field</button></div></details>
       ${areaField("Article (use [[Name]] to link)", "body", e.body, 12)}
       ${colorField("Colour", "color", e.color)}
       <details class="stats-ed" ${hasStats(e) ? "open" : ""}><summary>Game stats</summary>
@@ -186,26 +202,25 @@ function entryEditor(e, isNew) {
           ${field("Token size", `<select name="size">${Object.entries(TOKEN_SIZES).map(([k, l]) => `<option value="${k}" ${+k === (+s.size || 1) ? "selected" : ""}>${l}</option>`).join("")}</select>`)}</div>
         ${areaField("Stat block (attacks like 1d8+4 can be tapped to roll)", "block", s.block, 5)}
       </details>`,
-    onOpen: w => { w.dataset.entry = e.id; },
+    onOpen: w => { w.dataset.entry = e.id; w.dataset.kind = e.kind; },
     buttons: [{ label: "Cancel" }, {
       label: isNew ? "Create" : "Save", cls: "accent", act: w => {
         const v = formVals(w);
         if (!v.name.trim()) { toast("Give it a name first"); return false; }
         const k = byId(DB.kinds, v.kind) || DB.kinds[0];
-        const dates = {};
-        for (const n of ["start", "end", ...k.fields.filter(f => f.type === "date").map(f => "f_" + f.id)]) {
-          if (v[n]?.trim() && !parseDate(v[n])) { toast(`“${v[n]}” isn't a date I can read`); return false; }
-          dates[n] = parseDate(v[n]);
-        }
+        const dates = {}, fields = {};
+        try {
+          for (const n of ["start", "end"]) {
+            if (v[n]?.trim() && !parseDate(v[n])) throw new Error(`“${v[n]}” isn't a date I can read`);
+            dates[n] = parseDate(v[n]);
+          }
+          for (const f of k.fields) { const x = readField(f, v["f_" + f.id]); if (x !== undefined) fields[f.id] = x; }
+        } catch (err) { toast(err.message); return false; }
         Object.assign(e, {
           name: v.name.trim(), kind: k.id, summary: v.summary.trim(), aliases: splitList(v.aliases), tags: splitList(v.tags),
-          body: v.body, color: v.color, start: dates.start, end: dates.end, pc: v.pc,
+          body: v.body, color: v.color, start: dates.start, end: dates.end, pc: v.pc, fields,
+          extra: $$(".extra-row", w).map(r => ({ name: $(".x-name", r).value.trim(), value: $(".x-value", r).value.trim() })).filter(x => x.name || x.value),
         });
-        e.fields = {};
-        for (const f of k.fields) {
-          const x = f.type === "date" ? dates["f_" + f.id] : v["f_" + f.id];
-          if (x !== "" && x != null) e.fields[f.id] = f.type === "number" ? +x : x;
-        }
         const st = {};
         for (const n of ["hp", "maxhp", "ac", "init"]) if (v[n] !== "") st[n] = +v[n];
         if (+v.size !== 1) st.size = +v.size;
@@ -218,10 +233,15 @@ function entryEditor(e, isNew) {
     }],
   });
 }
+// switching kind keeps what's typed in any field the new kind has by the same name
 ACT.entryKindChanged = el => {
-  const w = el.closest(".modal-wrap"), e = byId(DB.entries, w.dataset.entry) || {};
-  const keep = formVals($("#kindFields", w));
-  $("#kindFields", w).innerHTML = kindFieldsHtml(el.value, { ...e, start: parseDate(keep.start), end: parseDate(keep.end) });
+  const w = el.closest(".modal-wrap"), from = byId(DB.kinds, w.dataset.kind), to = byId(DB.kinds, el.value);
+  const keep = formVals($("#kindFields", w)), byName = {};
+  for (const f of from?.fields || []) { try { const x = readField(f, keep["f_" + f.id]); if (x !== undefined) byName[norm(f.name)] = x; } catch {} }
+  const fields = {};
+  for (const f of to?.fields || []) if (norm(f.name) in byName) fields[f.id] = byName[norm(f.name)];
+  $("#kindFields", w).innerHTML = kindFieldsHtml(el.value, { fields, start: parseDate(keep.start), end: parseDate(keep.end) });
+  w.dataset.kind = el.value;
 };
 function newEntry(props = {}) {
   return { id: uid(), kind: props.kind || DB.kinds[0]?.id, name: "", aliases: [], tags: [], color: "", summary: "", body: "", fields: {}, rels: [], start: null, end: null, created: Date.now(), ...props };
@@ -235,7 +255,11 @@ ACT.deleteEntry = async el => {
     DB.entries = DB.entries.filter(x => x !== e);
     for (const o of DB.entries) {
       o.rels = (o.rels || []).filter(r => r.to !== e.id);
-      for (const f of kindOf(o).fields) if (f.type === "link" && o.fields?.[f.id] === e.id) delete o.fields[f.id];
+      for (const f of kindOf(o).fields) {
+        const v = o.fields?.[f.id];
+        if (f.type === "link" && v === e.id) delete o.fields[f.id];
+        if (f.type === "links" && Array.isArray(v)) { o.fields[f.id] = v.filter(x => x !== e.id); if (!o.fields[f.id].length) delete o.fields[f.id]; }
+      }
     }
     ENTITY_DELETE_HOOKS.forEach(h => h(e.id));
   });

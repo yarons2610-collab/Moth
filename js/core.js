@@ -33,15 +33,15 @@ const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sess
 let DB;
 
 function defaultKinds() {
-  const k = (id, name, icon, color, startLabel, endLabel, fields) =>
-    ({ id, name, icon, color, startLabel, endLabel, fields: fields.map(([name, type]) => ({ id: uid(), name, type })) });
+  // each starts with the fields suggested for it (fields.js)
+  const k = (id, name, icon, color, startLabel, endLabel) => ({ id, name, icon, color, startLabel, endLabel, fields: templateFields(id) });
   return [
-    k("character", "Character", "👤", "#e3c27a", "Born", "Died", [["Title", "text"], ["Home", "link"], ["Allegiance", "link"]]),
-    k("place", "Place", "🏰", "#81b29a", "Founded", "Destroyed", [["Type", "text"], ["Population", "number"], ["Ruler", "link"]]),
-    k("faction", "Faction", "⚑", "#e07a5f", "Founded", "Dissolved", [["Leader", "link"], ["Seat", "link"]]),
-    k("item", "Item", "🗝", "#7ea8f8", "Made", "Lost", [["Owner", "link"]]),
-    k("lore", "Lore", "📜", "#b9a6ff", "Begins", "Ends", []),
-    k("creature", "Creature", "🐉", "#f2a6c8", "First seen", "Gone", [["Habitat", "text"]]),
+    k("character", "Character", "👤", "#e3c27a", "Born", "Died"),
+    k("place", "Place", "🏰", "#81b29a", "Founded", "Destroyed"),
+    k("faction", "Faction", "⚑", "#e07a5f", "Founded", "Dissolved"),
+    k("item", "Item", "🗝", "#7ea8f8", "Made", "Lost"),
+    k("lore", "Lore", "📜", "#b9a6ff", "Begins", "Ends"),
+    k("creature", "Creature", "🐉", "#f2a6c8", "First seen", "Gone"),
   ];
 }
 
@@ -51,7 +51,8 @@ function normalizeDB(d) {
   d.world = Object.assign({ name: "Untitled world", eras: [{ id: uid(), name: "First Age", abbr: "FA", start: 1 }], months: [], now: { y: 1 } }, d.world || {});
   if (!d.world.eras.length) d.world.eras = [{ id: uid(), name: "Age", abbr: "", start: 1 }];
   for (const k of DB_ARRAYS) if (!Array.isArray(d[k])) d[k] = [];
-  if (!d.kinds.length) d.kinds = defaultKinds();
+  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 1; }
+  upgradeKinds(d);
   d.party ??= null;
   d.combat ??= null;
   d.updated ??= 0;
