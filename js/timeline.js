@@ -61,6 +61,10 @@ addRoute("timeline", "timeline", () => {
       <div class="tl-body"><b>${esc(x.title)}</b>${x.sub ? `<p>${esc(x.sub.replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, (m, a, b, c) => c || a).slice(0, 160))}</p>` : ""}</div></a>`;
   }
   if (items.length && !nowShown) html += nowRow;
+  // events with no date yet can't sit on the line, but mustn't vanish either
+  const undated = TL.show.event === false ? [] : DB.events.filter(ev => !ev.date &&
+    (!who || (ev.involves || []).includes(who.id) || mentionsIn(ev.body).some(m => m.it === who)) &&
+    (!q || norm(ev.title + " " + ev.body).includes(q)));
   const people = DB.entries.slice().sort((a, b) => a.name.localeCompare(b.name));
   const kinds = { event: "Events", life: "Lifespans", story: "Scenes", play: "Sessions" };
   return `<div class="page">
@@ -73,7 +77,12 @@ addRoute("timeline", "timeline", () => {
       ${Object.entries(kinds).map(([k, l]) => `<button class="fchip ${TL.show[k] ? "on" : ""}" data-act="tlKind" data-k="${k}">${l}</button>`).join("")}
     </div>
     ${who ? `<div class="follow-note">Following ${chip("e", who)}${who.start ? `, ${esc(lifespan(who))}` : ""}. Ages are shown at each event.</div>` : ""}
-    <div class="tl">${html || empty("Nothing dated yet. Add an event, or give codex entries a date.")}</div></div>`;
+    <div class="tl">${html || (undated.length ? "" : empty("Nothing dated yet. Add an event, or give codex entries a date."))}</div>
+    ${undated.length ? `<section class="panel undated"><div class="panel-h"><h4>Not dated yet</h4></div>
+      <p class="muted small">These events have no date, so they can't go on the line. Give one a date and it takes its place.</p>
+      <div class="list">${undated.map(ev => `<div class="row-card"><a href="#/ev/${ev.id}"><b>⏳ ${esc(ev.title)}</b></a>
+        ${ev.body ? `<small>${esc(plainLinks(ev.body).slice(0, 100))}</small>` : ""}<span class="spacer"></span>
+        <button class="btn small" data-act="editEvent" data-id="${ev.id}">Give it a date</button></div>`).join("")}</div></section>` : ""}</div>`;
 });
 ACT.tlFilter = el => { TL.q = el.value; rerender(); refocus(".page-h .search"); };
 ACT.tlFollow = el => { TL.follow = el.value; rerender(); };
