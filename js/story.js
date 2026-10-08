@@ -82,6 +82,7 @@ addRoute("book", "story", id => {
       }).join("")}</ol>
       <button class="btn small ghost" data-act="newScene" data-b="${b.id}" data-i="${ci}">+ Scene</button></section>`).join("")}
     <button class="btn" data-act="newChapter" data-id="${b.id}">+ Chapter</button>
+    ${notesPanel("book", b.id)}
   </div>`;
 });
 

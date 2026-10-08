@@ -216,6 +216,7 @@ addRoute("ss", "play", id => {
     <section class="panel"><div class="panel-h"><h4>Prep</h4></div>${mdBlock(s.prep, empty("No prep notes."))}</section>
     <section class="panel"><div class="panel-h"><h4>Recap</h4></div>${mdBlock(s.recap, empty("No recap yet."))}</section>
     <section class="panel"><div class="panel-h"><h4>The party's route</h4></div>${route ? `<ol class="route-list">${route}</ol>` : empty(s.playing ? "Move the 🛡 party marker on the map and each stop is logged here." : "Mark this session as now playing, then move the 🛡 party marker on the map.")}</section>
+    ${notesPanel("ss", s.id)}
   </div>`;
 });
 function sessionEditor(s, isNew) {
@@ -258,7 +259,7 @@ addRoute("q", "play", id => {
     <div class="kvs">${q.giver ? `<div class="kv"><span>Given by</span><div>${chip("e", byId(DB.entries, q.giver))}</div></div>` : ""}
       ${q.target ? `<div class="kv"><span>Leads to</span><div>${chip("e", byId(DB.entries, q.target))}</div></div>` : ""}
       ${q.reward ? `<div class="kv"><span>Reward</span><div>${inline(q.reward)}</div></div>` : ""}</div>
-    ${mdBlock(q.body)}</div>`;
+    ${mdBlock(q.body)}${notesPanel("q", q.id)}</div>`;
 });
 function questEditor(q, isNew) {
   modal({ title: isNew ? "New quest" : "Edit quest", wide: true,
@@ -300,7 +301,7 @@ addRoute("enc", "play", id => {
       ${(x.foes || []).map((f, i) => { const e = byId(DB.entries, f.entry), st = e?.stats || {}, sz = f.size || +st.size || 1; return `<tr><td>${e ? chip("e", e) : esc(f.name)}${sz !== 1 ? ` <small class="muted">${TOKEN_SIZES[sz] || sz + " squares"}</small>` : ""}</td><td>${f.count || 1}</td>
         <td>${esc(f.hp ?? st.maxhp ?? st.hp ?? "—")}</td><td>${esc(f.ac ?? st.ac ?? "—")}</td><td>${esc(f.init ?? st.init ?? 0)}</td>
         <td><button class="mini" data-act="delFoe" data-id="${x.id}" data-i="${i}">✕</button></td></tr>`; }).join("")}</table></section>
-    ${mdBlock(x.notes)}</div>`, main => wireBattle(main, x)];
+    ${mdBlock(x.notes)}${notesPanel("enc", x.id)}</div>`, main => wireBattle(main, x)];
 });
 function encounterEditor(x, isNew) {
   modal({ title: isNew ? "New encounter" : "Edit encounter",

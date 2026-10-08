@@ -113,7 +113,7 @@ addRoute("e", "codex", id => {
       ${t ? `<span class="fam-badge">${t}</span>` : ""}
       <span class="row-tools"><button class="mini" data-act="editRel" data-owner="${from.id}" data-rel="${r.id}" title="Edit">✎</button></span></li>`;
   }).join("");
-  const back = backlinks("e", e.id).filter(b => !(b.t === "e" && rels.some(x => x.from.id === b.it.id)));
+  const back = backlinks("e", e.id).filter(b => b.t !== "n" && !(b.t === "e" && rels.some(x => x.from.id === b.it.id)));
   const panels = ENTITY_PANELS.map(p => p(e)).filter(Boolean).join("");
   return `<div class="page entry" style="--c:${entryColor(e)}">
     <div class="entry-head">
@@ -139,6 +139,7 @@ addRoute("e", "codex", id => {
         <section class="panel"><div class="panel-h"><h4>Relationships</h4><button class="btn small" data-act="addRel" data-id="${e.id}">+ Add</button></div>
           ${relHtml ? `<ul class="rels">${relHtml}</ul>` : empty("No relationships yet.")}</section>
         ${panels}
+        ${notesPanel("e", e.id)}
         ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it, b.label !== "mentions" ? ` <small>${esc(b.label)}</small>` : "")).join("")}</div></section>` : ""}
       </div>
       <div class="col-side">

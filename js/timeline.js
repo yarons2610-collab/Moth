@@ -102,7 +102,7 @@ addRoute("ev", "timeline", id => {
   const ev = byId(DB.events, id);
   if (!ev) return `<div class="page">${empty("That event doesn't exist any more.")}</div>`;
   const inv = (ev.involves || []).map(i => byId(DB.entries, i)).filter(Boolean);
-  const back = backlinks("ev", ev.id);
+  const back = backlinks("ev", ev.id).filter(b => b.t !== "n");
   return `<div class="page narrow" style="--c:${ev.color || "var(--accent)"}">
     <div class="page-h"><div><div class="kind-line"><a href="#/timeline">⏳ Event</a></div><h2>${esc(ev.title)}</h2>
       <div class="life">${esc(fmtDate(ev.date) || "Undated")}${ev.end ? " to " + esc(fmtDate(ev.end)) : ""}</div></div>
@@ -111,6 +111,7 @@ addRoute("ev", "timeline", id => {
     ${inv.length ? `<div class="chips">${inv.map(e => chip("e", e, ev.date ? `<small>${ageNote(e, ev.date).replace(" · ", " ")}</small>` : "")).join("")}</div>` : ""}
     ${mdBlock(ev.body, empty("Nothing written about it yet."))}
     ${tagsHtml(ev.tags)}
+    ${notesPanel("ev", ev.id)}
     ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it)).join("")}</div></section>` : ""}
   </div>`;
 });
