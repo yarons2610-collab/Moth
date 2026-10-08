@@ -74,7 +74,7 @@ addRoute("codex", "codex", kind => {
 function entryCard(e) {
   const k = kindOf(e);
   return `<a class="card" href="#/e/${e.id}" style="--c:${entryColor(e)}">
-    <div class="card-pic">${e.portrait && assetSrc(e.portrait) ? `<img src="${assetSrc(e.portrait)}" alt="">` : `<span>${k.icon}</span>`}</div>
+    <div class="card-pic">${e.portrait ? assetImg(e.portrait) : `<span>${k.icon}</span>`}</div>
     <div class="card-b"><b>${esc(e.name)}${e.pc ? ` <span class="pc-badge">PC</span>` : ""}</b>
       <small>${esc(k.name)}${lifespan(e) ? " · " + esc(lifespan(e)) : ""}</small>
       ${e.summary ? `<p>${esc(e.summary)}</p>` : ""}
@@ -107,7 +107,7 @@ addRoute("e", "codex", id => {
   const panels = ENTITY_PANELS.map(p => p(e)).filter(Boolean).join("");
   return `<div class="page entry" style="--c:${entryColor(e)}">
     <div class="entry-head">
-      <button class="portrait" data-act="setPortrait" data-id="${e.id}" title="Change the picture">${e.portrait && assetSrc(e.portrait) ? `<img src="${assetSrc(e.portrait)}" alt="">` : `<span>${k.icon}</span><small>Add picture</small>`}</button>
+      <button class="portrait" data-act="setPortrait" data-id="${e.id}" title="Change the picture">${e.portrait ? assetImg(e.portrait) : `<span>${k.icon}</span><small>Add picture</small>`}</button>
       <div class="entry-title">
         <div class="kind-line"><a href="#/codex/${k.id}">${k.icon} ${esc(k.name)}</a>${e.pc ? ` <span class="pc-badge">Player character</span>` : ""}</div>
         <h2>${esc(e.name)}</h2>
@@ -150,7 +150,9 @@ function statBlock(e) {
       <div><small>Speed</small><b>${esc(s.speed || "—")}</b></div>
       <div><small>${e.pc ? "Level" : "Level/CR"}</small><b>${esc(s.level || "—")}</b></div>
     </div>
-    ${s.block ? `<div class="prose statblock">${md(s.block)}</div>` : ""}</section>`;
+    ${s.block ? `<div class="prose statblock">${md(s.block)}</div>` : ""}
+    <div class="token-row"><button class="token-pick" data-act="setToken" data-id="${e.id}" title="Token picture for battlemaps">${e.token || e.portrait ? assetImg(e.token || e.portrait) : `<span>${esc(initials(e.name))}</span>`}</button>
+      <small class="muted">Battlemap token${e.token ? "" : e.portrait ? " (uses the portrait)" : ""}${+s.size && +s.size !== 1 ? ` · ${TOKEN_SIZES[s.size] || s.size + " squares"}` : ""}. Tap to ${e.token ? "change" : "set"} it.</small></div></section>`;
 }
 
 /* ── editing ── */
@@ -179,7 +181,8 @@ function entryEditor(e, isNew) {
       <details class="stats-ed" ${hasStats(e) ? "open" : ""}><summary>Game stats</summary>
         <label class="check"><input type="checkbox" name="pc" ${e.pc ? "checked" : ""}> Player character (joins the party)</label>
         <div class="row3">${textField("HP now", "hp", s.hp ?? "", `type="number"`)}${textField("Max HP", "maxhp", s.maxhp ?? "", `type="number"`)}${textField("AC", "ac", s.ac ?? "", `type="number"`)}
-          ${textField("Initiative bonus", "init", s.init ?? "", `type="number"`)}${textField("Speed", "speed", s.speed ?? "")}${textField("Level / CR", "level", s.level ?? "")}</div>
+          ${textField("Initiative bonus", "init", s.init ?? "", `type="number"`)}${textField("Speed", "speed", s.speed ?? "")}${textField("Level / CR", "level", s.level ?? "")}
+          ${field("Token size", `<select name="size">${Object.entries(TOKEN_SIZES).map(([k, l]) => `<option value="${k}" ${+k === (+s.size || 1) ? "selected" : ""}>${l}</option>`).join("")}</select>`)}</div>
         ${areaField("Stat block (attacks like 1d8+4 can be tapped to roll)", "block", s.block, 5)}
       </details>`,
     onOpen: w => { w.dataset.entry = e.id; },
@@ -204,6 +207,7 @@ function entryEditor(e, isNew) {
         }
         const st = {};
         for (const n of ["hp", "maxhp", "ac", "init"]) if (v[n] !== "") st[n] = +v[n];
+        if (+v.size !== 1) st.size = +v.size;
         for (const n of ["speed", "level", "block"]) if (v[n].trim()) st[n] = v[n].trim();
         e.stats = Object.keys(st).length ? st : null;
         if (isNew) DB.entries.push(e);
@@ -240,7 +244,7 @@ ACT.setPortrait = async el => {
   const e = byId(DB.entries, el.dataset.id);
   if (e.portrait) {
     let choice = null;
-    await new Promise(res => modal({ title: "Picture", body: `<img class="portrait-big" src="${assetSrc(e.portrait)}" alt="">`, onClose: res,
+    await new Promise(res => modal({ title: "Picture", body: assetImg(e.portrait, "portrait-big"), onClose: res,
       buttons: [{ label: "Remove", cls: "danger", act: () => { choice = "rm"; } }, { label: "Replace", cls: "accent", act: () => { choice = "new"; } }] }));
     if (choice === "rm") { e.portrait = null; return commit(); }
     if (choice !== "new") return;

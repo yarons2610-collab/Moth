@@ -38,7 +38,7 @@ function epoch(e, year) {
   return "";
 }
 function mapBg(m) {
-  return m.asset && assetSrc(m.asset) ? `<img class="map-img" src="${assetSrc(m.asset)}" alt="" draggable="false">` : `<div class="parchment"></div>`;
+  return m.asset ? assetImg(m.asset, "map-img", `draggable="false"`) : `<div class="parchment"></div>`;
 }
 
 /* a cropped thumbnail of where an entry sits, for its codex page */
@@ -47,8 +47,7 @@ ENTITY_PANELS.push(e => {
   if (!spots.length) return "";
   return `<section class="panel"><div class="panel-h"><h4>On the map</h4></div><div class="map-thumbs">${spots.map(({ m, p }) => {
     const bw = 700, bh = bw * m.h / m.w, tw = 220, th = 140;
-    const bg = m.asset && assetSrc(m.asset) ? `background-image:url(${assetSrc(m.asset)});` : "";
-    return `<a class="map-thumb ${bg ? "" : "parch"}" href="#/map/${m.id}/${p.id}" style="${bg}background-size:${bw}px ${bh}px;background-position:${tw / 2 - p.x * bw}px ${th / 2 - p.y * bh}px">
+    return `<a class="map-thumb ${m.asset ? "" : "parch"}" href="#/map/${m.id}/${p.id}" ${m.asset ? `data-asset-bg="${m.asset}"` : ""} style="${assetSrc(m.asset) ? `background-image:url(${assetSrc(m.asset)});` : ""}background-size:${bw}px ${bh}px;background-position:${tw / 2 - p.x * bw}px ${th / 2 - p.y * bh}px">
       <i class="thumb-pin"></i><span>${esc(m.name)}</span></a>`;
   }).join("")}</div></section>`;
 });
@@ -129,7 +128,7 @@ function sidePanel(m) {
     for (const f of MAP_PLACE_PANELS) { const h = f(e, pin); if (h) sections.push(h); }
     const residents = backlinks("e", e.id).filter(b => b.t === "e" && b.label !== "mentions" && b.it.kind !== "place");
     if (residents.length) sections.push(`<h5>People and things here</h5><div class="chips">${residents.map(b => chip("e", b.it, ` <small>${esc(b.label)}</small>`)).join("")}</div>`);
-    body = `<div class="side-head" style="--c:${entryColor(e)}">${e.portrait && assetSrc(e.portrait) ? `<img src="${assetSrc(e.portrait)}" alt="">` : `<span class="side-icon">${kindOf(e).icon}</span>`}
+    body = `<div class="side-head" style="--c:${entryColor(e)}">${e.portrait ? assetImg(e.portrait) : `<span class="side-icon">${kindOf(e).icon}</span>`}
         <div><h3><a href="#/e/${e.id}">${esc(e.name)}</a></h3><small>${esc(kindOf(e).name)}${lifespan(e) ? " · " + esc(lifespan(e)) : ""}</small></div></div>
       ${e.summary ? `<p>${inline(e.summary)}</p>` : ""}
       ${child ? `<a class="btn accent wide" href="#/map/${child.id}">Open ${esc(child.name)} →</a>` : ""}
@@ -140,32 +139,33 @@ function sidePanel(m) {
   return `<button class="x side-x" data-act="mapUnsel" aria-label="Close">×</button>${body}${tools}`;
 }
 
-/* pan, zoom, pinch and taps */
-function wireMap(main, m, centreOnSel) {
-  const stage = $("#mapStage", main), layer = $("#mapLayer", main);
-  if (!stage) return;
-  let v = MAPV.view[m.id];
+/* pan, zoom, pinch and taps ── shared with battlemaps (battle.js).
+   v is the remembered view {k, x, y} (null fits the picture to the stage).
+   opts.onTap(event, px, py) gets taps in the picture's own pixels;
+   opts.skip(event) can claim a pointerdown for something else (a token drag);
+   opts.centre {x, y} zooms in on that point. Returns the view object. */
+function panZoom(stage, layer, w, h, v, opts = {}) {
   const fit = () => {
-    const k = Math.min(stage.clientWidth / m.w, stage.clientHeight / m.h) * 0.96;
-    return { k, x: (stage.clientWidth - m.w * k) / 2, y: (stage.clientHeight - m.h * k) / 2 };
+    const k = Math.min(stage.clientWidth / w, stage.clientHeight / h) * 0.96;
+    return { k, x: (stage.clientWidth - w * k) / 2, y: (stage.clientHeight - h * k) / 2 };
   };
-  if (!v) v = MAPV.view[m.id] = fit();
+  // a view kept from a stage of another size (a rotated phone, another page) starts over
+  if (!v || v.sw !== stage.clientWidth || v.sh !== stage.clientHeight) v = Object.assign(v || {}, fit());
+  v.sw = stage.clientWidth; v.sh = stage.clientHeight;
   const apply = () => { layer.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.k})`; layer.style.setProperty("--ik", 1 / v.k); };
   const zoomAt = (f, sx, sy) => {
     const k = clamp(v.k * f, 0.05, 8);
     v.x = sx - (sx - v.x) * k / v.k; v.y = sy - (sy - v.y) * k / v.k; v.k = k; apply();
   };
-  if (centreOnSel && MAPV.sel?.pin) {
-    const p = m.pins.find(x => x.id === MAPV.sel.pin);
-    if (p) { v.k = Math.max(v.k, fit().k * 2); v.x = stage.clientWidth / 2 - p.x * m.w * v.k; v.y = stage.clientHeight / 2 - p.y * m.h * v.k; }
-  }
+  if (opts.centre) { v.k = Math.max(v.k, fit().k * 2); v.x = stage.clientWidth / 2 - opts.centre.x * v.k; v.y = stage.clientHeight / 2 - opts.centre.y * v.k; }
   apply();
   stage._zoom = f => zoomAt(f, stage.clientWidth / 2, stage.clientHeight / 2);
   stage._fit = () => { Object.assign(v, fit()); apply(); };
+  stage._toLayer = (cx, cy) => { const r = stage.getBoundingClientRect(); return { x: (cx - r.left - v.x) / v.k, y: (cy - r.top - v.y) / v.k }; };
   const pts = new Map();
   let moved = 0, last = null, pinch = null;
   stage.addEventListener("pointerdown", e => {
-    if (e.target.closest(".zoom-btns")) return;
+    if (e.target.closest(".zoom-btns") || opts.skip?.(e)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     stage.setPointerCapture(e.pointerId);
     if (pts.size === 1) { moved = 0; last = { x: e.clientX, y: e.clientY }; }
@@ -189,15 +189,25 @@ function wireMap(main, m, centreOnSel) {
     if (!pts.has(e.pointerId)) return;
     pts.delete(e.pointerId);
     if (pts.size < 2) pinch = null;
-    if (pts.size === 0 && moved <= 6 && e.type === "pointerup") {
-      const r = stage.getBoundingClientRect();
-      mapTap(m, e, (e.clientX - r.left - v.x) / v.k / m.w, (e.clientY - r.top - v.y) / v.k / m.h);
+    if (pts.size === 0 && moved <= 6 && e.type === "pointerup" && opts.onTap) {
+      const p = stage._toLayer(e.clientX, e.clientY);
+      opts.onTap(e, p.x, p.y);
     }
     if (pts.size === 0) last = null;
   };
   stage.addEventListener("pointerup", up);
   stage.addEventListener("pointercancel", up);
   stage.addEventListener("wheel", e => { e.preventDefault(); const r = stage.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  return v;
+}
+function wireMap(main, m, centreOnSel) {
+  const stage = $("#mapStage", main), layer = $("#mapLayer", main);
+  if (!stage) return;
+  const p = centreOnSel && MAPV.sel?.pin && m.pins.find(x => x.id === MAPV.sel.pin);
+  MAPV.view[m.id] = panZoom(stage, layer, m.w, m.h, MAPV.view[m.id], {
+    centre: p ? { x: p.x * m.w, y: p.y * m.h } : null,
+    onTap: (e, px, py) => mapTap(m, e, px / m.w, py / m.h),
+  });
 }
 
 function mapTap(m, ev, x, y) {
@@ -233,8 +243,8 @@ function mapTap(m, ev, x, y) {
 
 ACT.mapTool = el => { MAPV.tool = el.dataset.t; MAPV.draft = []; MAPV.movePin = null; rerender(); };
 ACT.mapJump = el => go("#/map/" + el.value);
-ACT.mapZoom = el => $("#mapStage")?._zoom(+el.dataset.k);
-ACT.mapFit = () => $("#mapStage")?._fit();
+ACT.mapZoom = el => $("#" + (el.dataset.stage || "mapStage"))?._zoom(+el.dataset.k);
+ACT.mapFit = el => $("#" + (el.dataset.stage || "mapStage"))?._fit();
 ACT.mapUnsel = () => { MAPV.sel = null; rerender(); };
 ACT.mapYear = el => { MAPV.year = +el.value; clearTimeout(ACT.mapYear.t); $("#mapYearLbl").textContent = "As of " + fmtYear(MAPV.year); ACT.mapYear.t = setTimeout(rerender, 60); };
 ACT.mapYearNow = () => { MAPV.year = null; rerender(); };

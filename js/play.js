@@ -289,16 +289,17 @@ const foeSummary = x => (x.foes || []).map(f => (f.count > 1 ? f.count + "× " :
 addRoute("enc", "play", id => {
   const x = byId(DB.encounters, id);
   if (!x) return `<div class="page">${empty("That encounter doesn't exist any more.")}</div>`;
-  return `<div class="page narrow">${playTabs("encounters")}
+  return [`<div class="page">${playTabs("encounters")}
     <div class="page-h"><div><h2>⚔ ${esc(x.name)}</h2>${x.place ? `<div>at ${chip("e", byId(DB.entries, x.place))}</div>` : ""}</div><div class="spacer"></div>
       <button class="btn accent" data-act="runEncounter" data-id="${x.id}">▶ Run</button>
       <button class="btn" data-act="editEncounter" data-id="${x.id}">Edit</button><button class="btn ghost" data-act="deleteEncounter" data-id="${x.id}">🗑</button></div>
+    ${battlePanel(x)}
     <section class="panel"><div class="panel-h"><h4>Foes</h4><button class="btn small" data-act="addFoe" data-id="${x.id}">+ Foe</button></div>
       <table class="foes"><tr><th>Foe</th><th>×</th><th>HP</th><th>AC</th><th>Init</th><th></th></tr>
-      ${(x.foes || []).map((f, i) => { const e = byId(DB.entries, f.entry), st = e?.stats || {}; return `<tr><td>${e ? chip("e", e) : esc(f.name)}</td><td>${f.count || 1}</td>
+      ${(x.foes || []).map((f, i) => { const e = byId(DB.entries, f.entry), st = e?.stats || {}, sz = f.size || +st.size || 1; return `<tr><td>${e ? chip("e", e) : esc(f.name)}${sz !== 1 ? ` <small class="muted">${TOKEN_SIZES[sz] || sz + " squares"}</small>` : ""}</td><td>${f.count || 1}</td>
         <td>${esc(f.hp ?? st.maxhp ?? st.hp ?? "—")}</td><td>${esc(f.ac ?? st.ac ?? "—")}</td><td>${esc(f.init ?? st.init ?? 0)}</td>
         <td><button class="mini" data-act="delFoe" data-id="${x.id}" data-i="${i}">✕</button></td></tr>`; }).join("")}</table></section>
-    ${mdBlock(x.notes)}</div>`;
+    ${mdBlock(x.notes)}</div>`, main => wireBattle(main, x)];
 });
 function encounterEditor(x, isNew) {
   modal({ title: isNew ? "New encounter" : "Edit encounter",
@@ -326,12 +327,12 @@ ACT.addFoe = el => {
     body: `${field("From the codex", `<select name="entry">${entryOptions("", { blank: "— a quick foe instead —" })}</select>`)}
       ${textField("…or a quick foe's name", "name", "")}
       <div class="row3">${textField("How many", "count", 1, `type="number" min="1"`)}${textField("HP (blank: from stats)", "hp", "", `type="number"`)}${textField("AC", "ac", "", `type="number"`)}</div>
-      ${textField("Initiative bonus", "init", "", `type="number"`)}`,
+      <div class="row2">${textField("Initiative bonus", "init", "", `type="number"`)}${field("Token size", `<select name="size"><option value="">From its stats</option>${Object.entries(TOKEN_SIZES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select>`)}</div>`,
     buttons: [{ label: "Cancel" }, { label: "Add", cls: "accent", act: w => {
       const v = formVals(w);
       if (!v.entry && !v.name.trim()) { toast("Pick a creature or name a foe"); return false; }
-      const f = { entry: v.entry, name: v.entry ? "" : v.name.trim(), count: Math.max(1, +v.count || 1) };
-      for (const k of ["hp", "ac", "init"]) if (v[k] !== "") f[k] = +v[k];
+      const f = { id: uid(), entry: v.entry, name: v.entry ? "" : v.name.trim(), count: Math.max(1, +v.count || 1) };
+      for (const k of ["hp", "ac", "init", "size"]) if (v[k] !== "") f[k] = +v[k];
       (x.foes ||= []).push(f);
       commit();
     } }] });
@@ -350,13 +351,14 @@ ACT.runEncounter = el => {
       const v = formVals(w), list = [];
       for (const p of pcs) {
         const { hp, max } = hpOf(p), bonus = +(p.stats?.init || 0);
-        list.push({ id: uid(), name: p.name, entry: p.id, pc: true, hp, max, ac: p.stats?.ac ?? "", init: v["pc_" + p.id] !== "" ? +v["pc_" + p.id] : roll("1d20").total + bonus, mod: bonus, conds: [] });
+        list.push({ id: uid(), name: p.name, entry: p.id, pc: true, hp, max, ac: p.stats?.ac ?? "", init: v["pc_" + p.id] !== "" ? +v["pc_" + p.id] : roll("1d20").total + bonus, mod: bonus, conds: [], tok: "pc:" + p.id, size: 1 });
       }
       for (const f of x.foes || []) {
         const e = byId(DB.entries, f.entry), st = e?.stats || {};
         const n = f.count || 1, base = foeName(f);
         const hp = f.hp ?? st.maxhp ?? st.hp ?? 10, bonus = +(f.init ?? st.init ?? 0);
-        for (let i = 0; i < n; i++) list.push({ id: uid(), name: n > 1 ? `${base} ${i + 1}` : base, entry: f.entry || "", pc: false, hp, max: hp, ac: f.ac ?? st.ac ?? "", init: roll("1d20").total + bonus, mod: bonus, conds: [] });
+        const size = f.size || +st.size || 1;
+        for (let i = 0; i < n; i++) list.push({ id: uid(), name: n > 1 ? `${base} ${i + 1}` : base, entry: f.entry || "", pc: false, hp, max: hp, ac: f.ac ?? st.ac ?? "", init: roll("1d20").total + bonus, mod: bonus, conds: [], tok: `f:${foeId(f)}:${i}`, size });
       }
       list.sort((a, b) => b.init - a.init || b.mod - a.mod || (a.pc ? -1 : 1));
       DB.combat = { enc: x.id, round: 1, turn: 0, list, log: [`Combat begins: ${x.name}. Initiative: ${list.map(c => `${c.name} ${c.init}`).join(", ")}.`] };
@@ -368,11 +370,12 @@ addRoute("combat", "play", () => {
   const c = DB.combat;
   if (!c) return `<div class="page">${playTabs("")}${empty("No fight is running. Open an encounter and press Run.")}</div>`;
   const x = byId(DB.encounters, c.enc), cur = c.list[c.turn];
-  return `<div class="page">${playTabs("")}
+  return [`<div class="page ${x?.battle ? "wide" : ""}">${playTabs("")}
     <div class="page-h"><div><h2>⚔ ${esc(x?.name || "Combat")}</h2><div class="life">Round ${c.round}${cur ? ` · ${esc(cur.name)}'s turn` : ""}</div></div><div class="spacer"></div>
       <button class="btn" data-act="turn" data-d="-1">← Back</button><button class="btn accent" data-act="turn" data-d="1">Next turn →</button>
       <button class="btn" data-act="addCombatant">+ Add</button><button class="btn danger" data-act="endCombat">End combat</button></div>
-    <div class="init-list">${c.list.map((k, i) => `<div class="init-row ${i === c.turn ? "cur" : ""} ${k.hp <= 0 ? "down" : ""} ${k.pc ? "pc" : ""}">
+    <div class="${x?.battle ? "combat-grid" : ""}">${x?.battle ? `<div>${battlePanel(x)}</div>` : ""}<div>
+    <div class="init-list">${c.list.map((k, i) => `<div class="init-row ${i === c.turn ? "cur" : ""} ${k.hp <= 0 ? "down" : ""} ${k.pc ? "pc" : ""} ${BATTLEV.sel && BATTLEV.sel === (k.tok || "c:" + k.id) ? "sel" : ""}" data-tok="${esc(k.tok || "c:" + k.id)}">
       <span class="init-n" data-act="setInit" data-i="${i}" title="Change initiative">${k.init}</span>
       <div class="init-who"><b>${k.entry ? `<a href="#/e/${k.entry}">${esc(k.name)}</a>` : esc(k.name)}</b>${k.ac !== "" ? ` <span class="armor">AC ${esc(k.ac)}</span>` : ""}
         <div class="conds">${k.conds.map((cd, j) => `<span class="cond">${esc(cd)} <button class="mini" data-act="condDel" data-i="${i}" data-j="${j}">✕</button></span>`).join("")}
@@ -382,7 +385,7 @@ addRoute("combat", "play", () => {
         <button class="mini dmg" data-act="cHp" data-i="${i}" data-s="-1">Hit</button><button class="mini" data-act="cHp" data-i="${i}" data-s="1">Heal</button>
         <button class="mini" data-act="cRemove" data-i="${i}" title="Remove from the fight">✕</button></div>
     </div>`).join("")}</div>
-    <section class="panel"><div class="panel-h"><h4>Log</h4></div><ol class="combat-log">${c.log.slice().reverse().map(l => `<li>${esc(l)}</li>`).join("")}</ol></section></div>`;
+    <section class="panel"><div class="panel-h"><h4>Log</h4></div><ol class="combat-log">${c.log.slice().reverse().map(l => `<li>${esc(l)}</li>`).join("")}</ol></section></div></div></div>`, main => x && wireBattle(main, x)];
 });
 const clog = msg => DB.combat.log.push(`R${DB.combat.round}: ${msg}`);
 ACT.turn = el => {
@@ -433,7 +436,8 @@ ACT.addCombatant = () => modal({ title: "Add to the fight",
     if (!e && !v.name.trim()) { toast("Pick someone or give a name"); return false; }
     const hp = v.hp !== "" ? +v.hp : e?.pc ? hpOf(e).hp : st.maxhp ?? st.hp ?? 10;
     const k = { id: uid(), name: e?.name || v.name.trim(), entry: e?.id || "", pc: !!e?.pc, hp, max: e?.pc ? hpOf(e).max : (v.hp !== "" ? +v.hp : st.maxhp ?? hp), ac: v.ac !== "" ? +v.ac : st.ac ?? "",
-      init: v.init !== "" ? +v.init : roll("1d20").total + +(st.init || 0), mod: +(st.init || 0), conds: [] };
+      init: v.init !== "" ? +v.init : roll("1d20").total + +(st.init || 0), mod: +(st.init || 0), conds: [], size: +st.size || 1 };
+    k.tok = e?.pc ? "pc:" + e.id : "c:" + k.id;
     const c = DB.combat, cur = c.list[c.turn];
     c.list.push(k); c.list.sort((a, b) => b.init - a.init || b.mod - a.mod); c.turn = c.list.indexOf(cur);
     clog(`${k.name} joins the fight (initiative ${k.init}).`);

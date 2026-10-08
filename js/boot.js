@@ -15,5 +15,7 @@
   setSync(syncOn() ? (ls.get("dirty") ? "pending" : "ok") : "off");
   if (syncOn()) pull({ quiet: true });
   navigator.storage?.persist?.().catch(() => {});
+  // clear out images nothing uses any more (deletes are past undoing by now)
+  setTimeout(() => pruneAssets().catch(() => {}), 15000);
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("service-worker.js").catch(() => {});
 })();

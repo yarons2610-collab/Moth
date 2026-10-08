@@ -364,6 +364,41 @@ table.foes { width: 100%; border-collapse: collapse; }
 .tbl-results { padding-left: 20px; }
 .tbl-results li:first-child { font-weight: 600; color: var(--accent); }
 
+/* battlemaps and tokens */
+.battle-stage { position: relative; width: 100%; max-height: 68vh; min-height: 240px; border-radius: 10px; overflow: hidden; background: #08070d; touch-action: none; cursor: grab; }
+.battle-plain { width: 100%; height: 100%; background: radial-gradient(ellipse at 40% 30%, #2a2a33, #17161d 75%); }
+.battle-grid path { stroke: rgba(0, 0, 0, .55); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.battle-plain + .battle-grid path { stroke: rgba(255, 255, 255, .12); }
+#battleInfo.measuring { color: var(--accent); font-weight: 600; }
+.token { position: absolute; cursor: grab; touch-action: none; z-index: 2; transition: left .12s, top .12s; }
+.token.dragging { transition: none; z-index: 5; cursor: grabbing; opacity: .9; }
+/* inset, not padding: a percentage padding is measured against the whole battlemap */
+.tok-face { position: absolute; inset: 5%; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 45%, #15131f); border: 3px solid var(--c); box-shadow: 0 2px 6px rgba(0, 0, 0, .6); }
+.token.pc .tok-face { border-color: var(--accent2); }
+.token.foe .tok-face { border-color: var(--danger); }
+.tok-face span { font: 700 1em var(--disp); color: #fff; text-shadow: 0 1px 2px #000; }
+.tok-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.token.cur .tok-face { box-shadow: 0 0 0 4px var(--accent), 0 0 18px var(--accent); }
+.token.sel .tok-face { box-shadow: 0 0 0 4px #fff; }
+.token.down { filter: grayscale(1) brightness(.6); }
+.token.down::after { content: "✕"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--danger); font: 700 2.4em var(--disp); }
+.tok-hp { position: absolute; left: 10%; right: 10%; bottom: -2px; height: 6px; background: #111; border-radius: 3px; overflow: hidden; }
+.tok-hp b { display: block; height: 100%; }
+.tok-name { position: absolute; left: 50%; top: 100%; transform: translateX(-50%) scale(var(--ik)); transform-origin: 50% 0; margin-top: 3px; font: 600 11px var(--disp); background: rgba(11, 10, 18, .85); color: var(--ink); padding: 0 5px; border-radius: 4px; white-space: nowrap; display: none; }
+.token:hover .tok-name, .token.sel .tok-name, .token.cur .tok-name { display: block; }
+.combat-grid { display: grid; grid-template-columns: minmax(0, 1fr) 460px; gap: 14px; align-items: start; }
+.combat-grid .init-row { grid-template-columns: 40px minmax(0, 1fr) 120px; }
+.combat-grid .init-row .hp-btns { grid-column: 2 / -1; justify-content: flex-start; }
+.combat-grid .hp-bar { min-width: 0; }
+.init-row.sel { box-shadow: 0 0 0 2px #fff; }
+.token-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.token-pick { width: 46px; height: 46px; flex: none; border-radius: 50%; overflow: hidden; padding: 0; border: 3px solid var(--c, var(--accent2)); background: var(--bg2); display: grid; place-items: center; }
+.token-pick img { width: 100%; height: 100%; object-fit: cover; }
+.token-preview img { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; display: block; margin: 0 auto; }
+.storage-bar { height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; margin: 4px 0 10px; }
+.storage-bar i { display: block; height: 100%; background: var(--accent); }
+.storage-bar i.warn { background: var(--danger); }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }
@@ -381,6 +416,7 @@ table.foes { width: 100%; border-collapse: collapse; }
 .sync-state.ok { color: var(--ok); } .sync-state.err { color: var(--danger); } .sync-state.pending, .sync-state.busy { color: var(--accent); }
 
 /* phones */
+@media (max-width: 1100px) { .combat-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) {
   .top { flex-wrap: wrap; gap: 8px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); }
   .world-name { display: none; }
@@ -397,7 +433,8 @@ table.foes { width: 100%; border-collapse: collapse; }
   .span2 { grid-column: auto; }
   .kv { grid-template-columns: 90px 1fr; }
   .tl-item { grid-template-columns: 92px 28px 1fr; }
-  .init-row { grid-template-columns: 38px 1fr; }
+  .init-row, .combat-grid .init-row { grid-template-columns: 38px 1fr; }
+  .combat-grid { grid-template-columns: 1fr; }
   .init-row .hp-bar, .init-row .hp-btns { grid-column: 1 / -1; }
   .tool span { display: none; }
   /* the map's side panel becomes a sheet over the bottom of the map */

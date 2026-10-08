@@ -1,11 +1,17 @@
 "use strict";
 /* ── images ──
-   Maps and portraits are far too big for localStorage, so they live in
-   IndexedDB (moth-assets) as data URLs, and DB only holds their ids. All of
-   them are read into memory at startup so pages can draw them straight away. */
+   Maps, portraits, battlemaps and tokens are far too big for localStorage, so
+   they live in IndexedDB (moth-assets) as data URLs, and DB only holds their
+   ids. Only the ids are read at startup; an image is read from disk the first
+   time a page shows it, so memory use grows with what's on screen, not with
+   the size of the world. Pages draw images with assetImg() (or a data-asset-bg
+   attribute for backgrounds), which fill in once the image has been read. */
 
 const ASSET_DB = "moth-assets";
-const ASSETS = new Map(); // id → { data (data URL), url (object URL) }
+const ASSET_IDS = new Set();   // every image stored on this device
+const ASSET_URLS = new Map();  // id → object URL, for images already shown
+const ASSET_LOADING = new Set();
+const BLANK_IMG = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 let assetDbP = null;
 
 function assetDb() {
@@ -31,45 +37,84 @@ function dataToBlob(data) {
   for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
   return new Blob([u], { type: head.match(/data:([^;]+)/)?.[1] || "image/png" });
 }
-function remember(id, data) {
-  const old = ASSETS.get(id);
-  if (old?.data === data) return;
-  if (old) URL.revokeObjectURL(old.url);
-  ASSETS.set(id, { data, url: URL.createObjectURL(dataToBlob(data)) });
-}
 async function loadAssets() {
-  try {
-    const keys = await assetTx("readonly", st => st.getAllKeys());
-    const vals = await assetTx("readonly", st => st.getAll());
-    keys.forEach((k, i) => remember(k, vals[i]));
-  } catch (e) { console.warn("Images couldn't be read", e); }
+  try { for (const k of await assetTx("readonly", st => st.getAllKeys())) ASSET_IDS.add(k); }
+  catch (e) { console.warn("Images couldn't be read", e); }
 }
+const hasAsset = id => ASSET_IDS.has(id);
+// the stored data URL (for sync and export); read from disk, not kept in memory
+async function assetData(id) {
+  if (!ASSET_IDS.has(id)) return null;
+  try { return await assetTx("readonly", st => st.get(id)) || null; } catch { return null; }
+}
+function showAsset(id, url) {
+  for (const el of $$(`[data-asset="${id}"]`)) el.src = url;
+  for (const el of $$(`[data-asset-bg="${id}"]`)) el.style.backgroundImage = `url(${url})`;
+}
+// The image's URL if it's been read already; otherwise "" and it's read now,
+// and everything on the page waiting for it is filled in when it arrives.
+function assetSrc(id) {
+  if (!id) return "";
+  if (ASSET_URLS.has(id)) return ASSET_URLS.get(id);
+  if (ASSET_IDS.has(id) && !ASSET_LOADING.has(id)) {
+    ASSET_LOADING.add(id);
+    assetData(id).then(d => {
+      ASSET_LOADING.delete(id);
+      if (!d) return;
+      const url = URL.createObjectURL(dataToBlob(d));
+      ASSET_URLS.set(id, url);
+      showAsset(id, url);
+    });
+  }
+  return "";
+}
+const assetImg = (id, cls = "", attrs = "") => `<img class="${cls}" src="${assetSrc(id) || BLANK_IMG}" data-asset="${id}" alt="" ${attrs}>`;
+
 async function assetPut(data, id = "img" + uid()) {
-  remember(id, data);
   await assetTx("readwrite", st => st.put(data, id));
-  emit("assets");
+  ASSET_IDS.add(id);
+  const old = ASSET_URLS.get(id);
+  if (old) URL.revokeObjectURL(old);
+  ASSET_URLS.set(id, URL.createObjectURL(dataToBlob(data)));
+  showAsset(id, ASSET_URLS.get(id));
   return id;
 }
 async function assetDelete(id) {
-  const a = ASSETS.get(id);
-  if (a) URL.revokeObjectURL(a.url);
-  ASSETS.delete(id);
+  const u = ASSET_URLS.get(id);
+  if (u) URL.revokeObjectURL(u);
+  ASSET_URLS.delete(id);
+  ASSET_IDS.delete(id);
   await assetTx("readwrite", st => st.delete(id));
 }
-const assetSrc = id => ASSETS.get(id)?.url || "";
-const assetData = id => ASSETS.get(id)?.data || null;
 
 // Every image the world still uses. Images nobody uses are kept on this device
-// (so a delete can be undone) but are not synced or exported.
+// for a while (so a delete can be undone) but are not synced or exported.
 function usedAssets(db = DB) {
   const s = new Set();
-  for (const e of db.entries) if (e.portrait) s.add(e.portrait);
+  for (const e of db.entries) { if (e.portrait) s.add(e.portrait); if (e.token) s.add(e.token); }
   for (const m of db.maps) if (m.asset) s.add(m.asset);
+  for (const x of db.encounters) if (x.battle?.asset) s.add(x.battle.asset);
   return s;
 }
+// Images left over from deletes, once they're old enough not to be undone.
+async function pruneAssets() {
+  const used = usedAssets();
+  for (const id of [...ASSET_IDS]) if (!used.has(id) && !ASSET_URLS.has(id)) await assetDelete(id).catch(() => {});
+}
+// How much this world takes up, for Settings.
+async function assetSizes() {
+  let bytes = 0, n = 0;
+  const used = usedAssets();
+  await assetTx("readonly", st => {
+    const r = st.openCursor();
+    r.onsuccess = () => { const c = r.result; if (!c) return; if (used.has(c.key)) { bytes += c.value.length * 0.75; n++; } c.continue(); };
+  });
+  return { bytes, n };
+}
 
-// Shrink an upload so a phone can hold a whole atlas: maps up to 4096px on the
-// long side, portraits up to 640px. PNGs that stay small keep their transparency.
+// Shrink an upload so a phone can hold a whole atlas: maps and battlemaps up to
+// 4096px on the long side, portraits 640px, tokens 256px. PNGs that stay small
+// keep their transparency; everything else becomes a JPEG.
 function readImage(file, maxPx) {
   return new Promise((res, rej) => {
     const img = new Image(), url = URL.createObjectURL(file);
@@ -81,7 +126,7 @@ function readImage(file, maxPx) {
       c.width = w; c.height = h;
       c.getContext("2d").drawImage(img, 0, 0, w, h);
       let data = file.type === "image/png" ? c.toDataURL("image/png") : "";
-      if (!data || data.length > 1.5e6) data = c.toDataURL("image/jpeg", 0.86);
+      if (!data || data.length > Math.max(400e3, maxPx * maxPx * 0.12)) data = c.toDataURL("image/jpeg", 0.85);
       res({ data, w, h });
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("That file isn't an image this browser can read")); };

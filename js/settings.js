@@ -6,7 +6,7 @@ const FIELD_TYPES = { text: "Short text", long: "Long text", number: "Number", d
 
 addRoute("settings", "", () => {
   const w = DB.world;
-  return `<div class="page narrow settings">
+  return [`<div class="page narrow settings">
     <h2>Settings</h2>
     <section class="panel"><div class="panel-h"><h4>World</h4></div>
       ${textField("Name", "worldName", w.name, `data-change="setWorldName"`)}
@@ -30,13 +30,40 @@ addRoute("settings", "", () => {
           It is stored only on this device.</p>
         <div class="row-inline"><input id="ghToken" type="password" placeholder="ghp_…" autocomplete="off"><button class="btn accent" data-act="syncConnect">Connect</button></div>`}</section>
 
+    <section class="panel"><div class="panel-h"><h4>Space used</h4></div><div id="storageInfo" class="muted">Measuring…</div></section>
+
     <section class="panel"><div class="panel-h"><h4>Your data</h4></div>
       <p class="muted">An export is one .json file with the whole world and its images.</p>
       <div class="btn-row"><button class="btn" data-act="exportWorld">Export</button><button class="btn" data-act="importWorld">Import…</button>
         <button class="btn" data-act="loadSample">Load the sample world</button><button class="btn danger" data-act="resetWorld">Start an empty world</button></div></section>
     <p class="muted small">Moth: a play on myth. Works offline, and can be installed from the browser's menu (Add to Home Screen).</p>
-  </div>`;
+  </div>`, showStorage];
 });
+
+/* How big the world is, against the limits that matter:
+   - the world's text lives in localStorage, which browsers cap at about 5 MB;
+   - images live in IndexedDB, limited only by the device's free space;
+   - a Gist lists at most 300 files, so sync tops out a little under 300 images. */
+const LS_LIMIT = 5e6, GIST_FILES = 300;
+const mb = n => (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + " MB";
+function bar(frac) { return `<div class="storage-bar"><i class="${frac > 0.75 ? "warn" : ""}" style="width:${clamp(frac, 0.005, 1) * 100}%"></i></div>`; }
+async function showStorage(main) {
+  const box = $("#storageInfo", main);
+  if (!box) return;
+  const text = JSON.stringify(DB).length * 2; // localStorage counts UTF-16 characters
+  const imgs = await assetSizes().catch(() => ({ bytes: 0, n: 0 }));
+  const est = await navigator.storage?.estimate?.().catch(() => null);
+  const kept = await navigator.storage?.persisted?.().catch(() => false);
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  const lines = [
+    `<div><b>World text</b> ${mb(text)} of about ${mb(LS_LIMIT)}${bar(text / LS_LIMIT)}</div>`,
+    `<div><b>Images</b> ${plural(imgs.n, "image")}, ${mb(imgs.bytes)} (limited by the device's free space${est?.quota ? `: ${mb(est.quota)} available to Moth` : ""})</div>`,
+  ];
+  if (syncOn()) lines.push(`<div style="margin-top:8px"><b>Sync</b> ${imgs.n} of about ${GIST_FILES - 1} images a Gist can hold${bar(imgs.n / (GIST_FILES - 1))}</div>`);
+  if (!kept) lines.push(`<p class="small">${standalone ? "The browser hasn't promised to keep Moth's data." : "Install Moth (Add to Home Screen) so the browser keeps its data: Safari can clear the data of websites you haven't opened for a week, but not of installed apps."} Export now and then, or turn on sync, so there's always a copy.</p>`);
+  box.innerHTML = lines.join("");
+  box.classList.remove("muted");
+}
 const syncLabel = () => ({ off: "Off", ok: "Up to date", busy: "Syncing…", pending: "Changes waiting", err: "Problem: " + SYNC.msg })[SYNC.state] || SYNC.state;
 on("syncState", () => { if (CUR.prefix === "settings") { const s = $(".sync-state"); if (s) { s.className = "sync-state " + SYNC.state; s.textContent = syncLabel(); } } });
 
@@ -93,7 +120,7 @@ ACT.syncConnect = async () => {
 ACT.syncNow = async () => { await pull(); if (ls.get("dirty")) await push(); rerender(); };
 ACT.syncOff = async () => { if (await ask("Stop syncing on this device?", "The world stays here and in the Gist; they just stop talking.", "Stop syncing", "")) { disconnectGist(); rerender(); } };
 
-ACT.exportWorld = () => download(`${fileSlug(DB.world.name)}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(exportBundle()));
+ACT.exportWorld = async () => download(`${fileSlug(DB.world.name)}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await exportBundle()));
 ACT.importWorld = () => {
   const inp = document.createElement("input");
   inp.type = "file"; inp.accept = ".json,application/json";

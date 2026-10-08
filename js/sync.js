@@ -65,7 +65,7 @@ async function applyRemote(g) {
   const data = JSON.parse(text);
   for (const n of assetFiles(g)) {
     const id = fileAsset(n);
-    if (!assetData(id)) await assetPut(await fileText(g.files[n]), id);
+    if (!hasAsset(id)) await assetPut(await fileText(g.files[n]), id);
   }
   SYNC.applying = true;
   DB = normalizeDB(data);
@@ -121,8 +121,8 @@ async function push() {
     // images one at a time, so no single request gets huge
     const known = new Set(JSON.parse(ls.get("assets") || "[]")), used = usedAssets();
     let g = null;
-    for (const a of used) if (!known.has(a) && assetData(a)) {
-      g = await gh("PATCH", "/gists/" + id, { files: { [`asset_${a}.txt`]: { content: assetData(a) } } });
+    for (const a of used) if (!known.has(a) && hasAsset(a)) {
+      g = await gh("PATCH", "/gists/" + id, { files: { [`asset_${a}.txt`]: { content: await assetData(a) } } });
       known.add(a); ls.set("assets", JSON.stringify([...known]));
     }
     const gone = [...known].filter(a => !used.has(a));
@@ -152,7 +152,7 @@ function conflict(g) {
       onClose: () => res(),
       buttons: [
         { label: "Keep the other device's", act: async () => {
-          download(fileSlug(DB.world.name) + "-this-device-backup.json", JSON.stringify(exportBundle()));
+          download(fileSlug(DB.world.name) + "-this-device-backup.json", JSON.stringify(await exportBundle()));
           try { await applyRemote(g); setSync("ok", "Up to date"); } catch (e) { setSync("err", e.message); }
         } },
         { label: "Keep this device's", cls: "accent", act: async () => {
@@ -190,8 +190,8 @@ async function connectGist(token) {
 function disconnectGist() { for (const k of Object.keys(SYNC_KEYS)) if (k !== "dirty") ls.set(k, ""); setSync("off"); }
 
 // one file holding the world and the images it uses (for export, and backups)
-function exportBundle() {
+async function exportBundle() {
   const assets = {};
-  for (const a of usedAssets()) if (assetData(a)) assets[a] = assetData(a);
+  for (const a of usedAssets()) { const d = await assetData(a); if (d) assets[a] = d; }
   return { moth: 1, exported: new Date().toISOString(), db: DB, assets };
 }
