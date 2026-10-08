@@ -23,12 +23,7 @@ addRoute("settings", "", () => {
         <button class="btn small" data-act="editKind" data-id="${k.id}">Edit</button></li>`).join("")}</ul></section>
 
     <section class="panel"><div class="panel-h"><h4>Sync between devices</h4><span class="sync-state ${SYNC.state}">${esc(syncLabel())}</span></div>
-      ${syncOn() ? `<p>Syncing through a private GitHub Gist${ls.get("id") ? ` (<a href="https://gist.github.com/${esc(ls.get("id"))}" target="_blank" rel="noopener">open it</a>)` : ""}. Each image is its own file in the Gist.</p>
-        <div class="btn-row"><button class="btn" data-act="syncNow">Sync now</button><button class="btn ghost" data-act="syncOff">Stop syncing on this device</button></div>`
-      : `<p class="muted">Your world lives in this browser. To use it on more than one device, make a GitHub token with only the <b>gist</b> permission
-          (<a href="https://github.com/settings/tokens/new?scopes=gist&description=Moth" target="_blank" rel="noopener">make one here</a>) and paste it below on each device.
-          It is stored only on this device.</p>
-        <div class="row-inline"><input id="ghToken" type="password" placeholder="ghp_…" autocomplete="off"><button class="btn accent" data-act="syncConnect">Connect</button></div>`}</section>
+      ${syncOn() ? syncConnectedHtml() : syncSetupHtml()}</section>
 
     <section class="panel"><div class="panel-h"><h4>Space used</h4></div><div id="storageInfo" class="muted">Measuring…</div></section>
 
@@ -59,11 +54,45 @@ async function showStorage(main) {
     `<div><b>World text</b> ${mb(text)} of about ${mb(LS_LIMIT)}${bar(text / LS_LIMIT)}</div>`,
     `<div><b>Images</b> ${plural(imgs.n, "image")}, ${mb(imgs.bytes)} (limited by the device's free space${est?.quota ? `: ${mb(est.quota)} available to Moth` : ""})</div>`,
   ];
-  if (syncOn()) lines.push(`<div style="margin-top:8px"><b>Sync</b> ${imgs.n} of about ${GIST_FILES - 1} images a Gist can hold${bar(imgs.n / (GIST_FILES - 1))}</div>`);
+  if (syncOn() && backendName() === "gist") lines.push(`<div style="margin-top:8px"><b>Sync</b> ${imgs.n} of about ${GIST_FILES - 1} pictures a Gist can hold${bar(imgs.n / (GIST_FILES - 1))}${imgs.n > 150 ? `<span class="small">Moving to a repository (above) removes this limit.</span>` : ""}</div>`);
+  if (syncOn() && backendName() === "repo") lines.push(`<div style="margin-top:8px"><b>Sync</b> through a repository: no file limit. GitHub is happy up to about 1 GB; this world is about ${mb(text / 2 + imgs.bytes)}.</div>`);
   if (!kept) lines.push(`<p class="small">${standalone ? "The browser hasn't promised to keep Moth's data." : "Install Moth (Add to Home Screen) so the browser keeps its data: Safari can clear the data of websites you haven't opened for a week, but not of installed apps."} Export now and then, or turn on sync, so there's always a copy.</p>`);
   box.innerHTML = lines.join("");
   box.classList.remove("muted");
 }
+function syncConnectedHtml() {
+  const be = backend(), where = be.where();
+  const name = backendName() === "repo" ? `the private repository <b>${esc(ls.get("repo"))}</b>` : "a private GitHub Gist";
+  return `<p>Syncing through ${name}${where ? ` (<a href="${where}" target="_blank" rel="noopener">open it</a>)` : ""}.</p>
+    <div class="btn-row"><button class="btn" data-act="syncNow">Sync now</button><button class="btn ghost" data-act="syncOff">Stop syncing on this device</button></div>
+    ${backendName() === "gist" ? `<div class="move-box"><b>Move to a GitHub repository</b>
+      <p class="muted small">A Gist holds about 300 files, and every picture is one. A private repository has no such limit, stores pictures as real image files (a quarter smaller) and saves each sync in one go.
+        Your other devices follow the move by themselves; they just need a token that can use the repository (the steps are below the button).</p>
+      <div class="row-inline"><input id="moveRepo" value="moth-world" placeholder="moth-world"><button class="btn accent" data-act="syncMove">Move</button></div>
+      ${tokenHelp("repo")}</div>` : ""}`;
+}
+function syncSetupHtml() {
+  return `<p class="muted">Your world lives in this browser. To have it on your phone and your computer, Moth keeps a copy on GitHub (free) and each device syncs with it. Do this once on each device, with the same token.</p>
+    <div class="sync-choice">
+      <label class="check"><input type="radio" name="syncKind" value="repo" checked data-change="syncKind"> <span><b>A private repository</b> (recommended): no real limit on maps and pictures</span></label>
+      <label class="check"><input type="radio" name="syncKind" value="gist" data-change="syncKind"> <span><b>A Gist</b>: fine for a world with up to about 300 pictures</span></label>
+    </div>
+    <div id="syncHelp">${tokenHelp("repo")}</div>
+    <div class="row-inline" id="repoRow"><label class="inline">Repository</label><input id="repoName" value="moth-world" placeholder="moth-world"></div>
+    <div class="row-inline"><input id="ghToken" type="password" placeholder="Paste the token (github_pat_… or ghp_…)" autocomplete="off"><button class="btn accent" data-act="syncConnect">Connect</button></div>`;
+}
+function tokenHelp(kind) {
+  if (kind === "gist") return `<p class="small">Make a token with only the <b>gist</b> permission (<a href="https://github.com/settings/tokens/new?scopes=gist&description=Moth" target="_blank" rel="noopener">make one here</a>), and paste it below. It's stored only on this device.</p>`;
+  return `<ol class="small token-steps">
+    <li>Easiest: <a href="https://github.com/settings/tokens/new?scopes=repo&description=Moth" target="_blank" rel="noopener">make a token with the “repo” permission</a>. Moth creates the private repository for you. (That token can reach all your repositories.)</li>
+    <li>Safer: <a href="https://github.com/new?name=moth-world&visibility=private" target="_blank" rel="noopener">create a private repository</a> called <b>moth-world</b> (tick “Add a README”), then
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">make a fine-grained token</a> with access to only that repository and <b>Contents: Read and write</b>.</li>
+  </ol><p class="small muted">The token is stored only on this device.</p>`;
+}
+ACT.syncKind = el => {
+  $("#syncHelp").innerHTML = tokenHelp(el.value);
+  $("#repoRow").hidden = el.value !== "repo";
+};
 const syncLabel = () => ({ off: "Off", ok: "Up to date", busy: "Syncing…", pending: "Changes waiting", err: "Problem: " + SYNC.msg })[SYNC.state] || SYNC.state;
 on("syncState", () => { if (CUR.prefix === "settings") { const s = $(".sync-state"); if (s) { s.className = "sync-state " + SYNC.state; s.textContent = syncLabel(); } } });
 
@@ -111,14 +140,23 @@ ACT.editKind = el => {
 };
 
 ACT.syncConnect = async () => {
-  const t = $("#ghToken").value.trim();
+  const t = $("#ghToken").value.trim(), kind = $("input[name=syncKind]:checked")?.value || "repo";
   if (!t) return toast("Paste a token first");
-  try { await connectGist(t); toast("Connected. This world now syncs through a private Gist."); }
-  catch (e) { toast(e.message); }
+  try {
+    await connectSync(t, kind, kind === "repo" ? $("#repoName").value.trim() || "moth-world" : "");
+    toast(SYNC.state === "err" ? "Connected, but: " + SYNC.msg : `Connected. This world now syncs through ${kind === "repo" ? ls.get("repo") : "a private Gist"}.`, { ms: 6000 });
+  } catch (e) { toast(e.message); }
+  rerender();
+};
+ACT.syncMove = async el => {
+  const repo = $("#moveRepo").value.trim() || "moth-world";
+  el.disabled = true; el.textContent = "Moving…";
+  try { await moveToRepo(repo); toast(`Moved. This world now syncs through ${ls.get("repo")}.`, { ms: 6000 }); }
+  catch (e) { toast("Couldn't move: " + e.message, { ms: 9000 }); }
   rerender();
 };
 ACT.syncNow = async () => { await pull(); if (ls.get("dirty")) await push(); rerender(); };
-ACT.syncOff = async () => { if (await ask("Stop syncing on this device?", "The world stays here and in the Gist; they just stop talking.", "Stop syncing", "")) { disconnectGist(); rerender(); } };
+ACT.syncOff = async () => { if (await ask("Stop syncing on this device?", "The world stays here and on GitHub; they just stop talking.", "Stop syncing", "")) { disconnectSync(); rerender(); } };
 
 ACT.exportWorld = async () => download(`${fileSlug(DB.world.name)}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await exportBundle()));
 ACT.importWorld = () => {
