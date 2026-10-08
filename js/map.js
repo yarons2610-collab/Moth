@@ -340,7 +340,7 @@ function addMap(name, img) {
   return m;
 }
 ACT.newMap = async () => {
-  MODALS.forEach(x => x.close());
+  [...MODALS].forEach(x => x.close());
   const m = await createMap("");
   if (!m) return;
   if (m.drawNow) { delete m.drawNow; return openDrawing("map", m.id); }
@@ -361,12 +361,12 @@ ACT.mapMenu = el => {
 ACT.mapImage = async el => {
   const m = byId(DB.maps, el.dataset.id), img = await pickImage(4096);
   if (!img) return;
-  MODALS.forEach(x => x.close());
+  [...MODALS].forEach(x => x.close());
   Object.assign(m, { asset: img.id, w: img.w, h: img.h });
   delete MAPV.view[m.id];
   commit();
 };
-ACT.mapParchment = el => { const m = byId(DB.maps, el.dataset.id); MODALS.forEach(x => x.close()); Object.assign(m, { asset: null, w: PARCHMENT.w, h: PARCHMENT.h }); delete MAPV.view[m.id]; commit(); };
+ACT.mapParchment = el => { const m = byId(DB.maps, el.dataset.id); [...MODALS].forEach(x => x.close()); Object.assign(m, { asset: null, w: PARCHMENT.w, h: PARCHMENT.h }); delete MAPV.view[m.id]; commit(); };
 ACT.mapDelete = async m => {
   if (!await ask(`Delete the map “${m.name}”?`, "Its pins and regions go with it. You can undo this straight afterwards.")) return;
   withUndo("Map deleted", () => {

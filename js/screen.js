@@ -65,7 +65,7 @@ ACT.screenOpen = async () => {
       if (other) { playerWin.moveTo(other.availLeft, other.availTop); playerWin.resizeTo(other.availWidth, other.availHeight); }
     }
   } catch {}
-  MODALS.forEach(m => m.close());
+  [...MODALS].forEach(m => m.close());
   setTimeout(updateScreenBtn, 1500);
 };
 
@@ -115,12 +115,12 @@ ACT.handoutAdd = async () => {
   const title = prompt("A name for this handout", "Handout") || "Handout";
   DB.handouts.push({ id: uid(), asset: img.id, title });
   save();
-  MODALS.forEach(m => m.close());
+  [...MODALS].forEach(m => m.close());
   ACT.screenPanel();
 };
 ACT.handoutDelete = el => {
   withUndo("Handout deleted", () => { DB.handouts = DB.handouts.filter(h => h.id !== el.dataset.id); });
-  MODALS.forEach(m => m.close());
+  [...MODALS].forEach(m => m.close());
   ACT.screenPanel();
 };
 

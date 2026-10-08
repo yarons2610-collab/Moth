@@ -138,9 +138,10 @@ addRoute("e", "codex", id => {
   return `<div class="page entry" style="--c:${entryColor(e)}">
    <div class="entry-layout">
     <header class="entry-top">
-      <div class="entry-topline"><div class="kind-line"><a href="#/codex/${k.id}">${k.icon} ${esc(k.name)}</a>${e.pc ? ` <span class="pc-badge">Player character</span>` : ""}</div>
+      <div class="entry-topline"><div class="kind-line"><a href="#/codex/${k.id}">${k.icon} ${esc(k.name)}</a>${e.pc ? ` <span class="pc-badge">Player character</span>` : ""}${versionBadge(e)}</div>
         <div class="entry-actions">
           <button class="btn" data-act="screenEntry" data-id="${e.id}" title="Show the players this entry's picture and name">📺</button>
+          <button class="btn" data-act="versions" data-id="${e.id}" title="Versions: keep alternative takes on this entry">⎇</button>
           <button class="btn accent" data-act="editEntry" data-id="${e.id}">Edit</button>
           <button class="btn ghost" data-act="deleteEntry" data-id="${e.id}" title="Delete">🗑</button>
         </div></div>

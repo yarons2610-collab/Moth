@@ -12,6 +12,7 @@
 - **Battlemaps** for encounters, with tokens that snap to the grid, fog of war and hidden tokens.
 - **A player screen** for the TV: a second window that shows only what you send it (a battlemap through its fog, a map without secret pins, a picture, a handout, read-aloud text). Your own window keeps everything.
 - **Music**: Spotify, YouTube, SoundCloud or Apple Music playlists linked to encounters, played from a dock that stays put while you work.
+- **Versions**: an entry can hold named alternative versions (Canon, Darker backstory…); switch which is live, compare them and copy parts across.
 - `[[Wiki links]]` everywhere, with backlinks on every page. Find anything with `Ctrl/⌘ K` or `/`.
 
 It's a plain static site: no build step and no server. It works offline, can be installed on a phone, and keeps your world in your browser. To use it on more than one device, it syncs through a private GitHub repository (or a Gist), with pictures and drawings as their own files.

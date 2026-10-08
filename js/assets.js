@@ -92,7 +92,11 @@ async function assetDelete(id) {
 // for a while (so a delete can be undone) but are not synced or exported.
 function usedAssets(db = DB) {
   const s = new Set();
-  for (const e of db.entries) { if (e.portrait) s.add(e.portrait); if (e.token) s.add(e.token); }
+  for (const e of db.entries) {
+    if (e.portrait) s.add(e.portrait); if (e.token) s.add(e.token);
+    // pictures of versions that aren't live are still in use
+    for (const v of e.versions || []) { if (v.data?.portrait) s.add(v.data.portrait); if (v.data?.token) s.add(v.data.token); }
+  }
   for (const m of db.maps) { if (m.asset) s.add(m.asset); if (m.draw) s.add(m.draw); }
   for (const x of db.encounters) { if (x.battle?.asset) s.add(x.battle.asset); if (x.battle?.draw) s.add(x.battle.draw); }
   for (const st of db.stamps || []) if (st.asset) s.add(st.asset);

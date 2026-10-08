@@ -157,7 +157,7 @@ const draftKey = t => `draft:${t.kind}:${t.id}`;
 async function openDrawing(kind, id) {
   const t = drawTarget(kind, id);
   if (!t) return toast("That isn't there any more");
-  MODALS.forEach(x => x.close());
+  [...MODALS].forEach(x => x.close());
   const draft = await assetData(draftKey(t)).catch(() => null);
   let d;
   if (draft) { d = JSON.parse(draft); toast("Picked up your unsaved drawing where you left it"); }

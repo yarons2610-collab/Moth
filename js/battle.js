@@ -240,7 +240,7 @@ const freshBattle = (x, p) => ({ asset: null, w: 20 * PLAIN_CELL, h: 14 * PLAIN_
 ACT.battleImage = async el => {
   const x = byId(DB.encounters, el.dataset.id), img = await pickImage(4096);
   if (!img) return;
-  MODALS.forEach(m => m.close());
+  [...MODALS].forEach(m => m.close());
   // a first guess at the grid, which the next dialog asks you to correct
   const across = clamp(Math.round(img.w / 100), 10, 40);
   x.battle = freshBattle(x, { asset: img.id, w: img.w, h: img.h, cell: img.w / across });
@@ -286,7 +286,7 @@ ACT.battleSetup = (el, fresh = false) => {
         commit();
       } }] });
 };
-ACT.battleReset = el => { const x = byId(DB.encounters, el.dataset.id); MODALS.forEach(m => m.close()); x.battle.tokens = {}; commit(); };
+ACT.battleReset = el => { const x = byId(DB.encounters, el.dataset.id); [...MODALS].forEach(m => m.close()); x.battle.tokens = {}; commit(); };
 
 // a token picture, separate from the portrait (which is used when there's none)
 ACT.setToken = async el => {

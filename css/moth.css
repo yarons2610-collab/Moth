@@ -609,6 +609,24 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .codex-group small { color: var(--ink-faint); font: 12px var(--mono); }
 .codex-group .btn { margin-left: auto; }
 
+/* versions */
+.ver-badge { margin-left: 8px; border: 1px solid var(--line2); background: var(--bg2); color: var(--accent2); border-radius: 99px; padding: 1px 9px; font-size: 12px; }
+.ver-badge small { color: var(--ink-faint); }
+.ver-list { display: flex; flex-direction: column; gap: 6px; }
+.ver-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.ver-row.live { border-color: var(--ok); }
+.ver-name { flex: 1; min-width: 180px; display: flex; flex-direction: column; }
+.ver-tools { display: flex; gap: 4px; align-items: center; }
+.ver-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ver-table th { text-align: left; font-size: 12px; color: var(--ink-dim); padding: 6px; }
+.ver-table td { vertical-align: top; padding: 8px 6px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.ver-table td:first-child, .ver-table th:first-child { width: 120px; }
+.ver-label { color: var(--ink-dim); font-size: 12.5px; }
+.ver-table .btn { margin-top: 6px; }
+.ver-article { max-height: 220px; overflow: auto; font-size: 13.5px; }
+.ver-pic { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
+@media (max-width: 760px) { .ver-table td:first-child, .ver-table th:first-child { width: 70px; } }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }
