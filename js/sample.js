@@ -67,6 +67,11 @@ function sampleWorld() {
     body: "Before the [[The Flood|Flood]] she kept a lamp on the cliffs above [[Old Lumen]]. When the sea came she kept it lit all night, and every ship that saw it reached the hills. In the morning she was gone, and the lamp was still burning." });
   add("faith", "religion", "The Lamplit Faith", { summary: "Saltmere's faith: keep a light for those still at sea.", start: { y: AF(12) }, color: "#e8b04a" });
   add("tidecult", "religion", "The Drowned Saints", { summary: "The Tidebound's creed: the sea took the Old Kingdom to keep it safe, and will give it back to the faithful.", color: "#4a8fc0" });
+  add("tidecalling", "magic", "Tidecalling", { summary: "Speaking to the sea, and sometimes being answered. Old Kingdom magic, mostly forgotten.", color: "#4a8fc0",
+    body: "Every tidecaller learns the first rule before anything else: *the sea always asks for something back.*" });
+  add("breath", "spell", "Breath of the Deep", { summary: "Breathe water for as long as you hold the sea's attention." });
+  add("callDrowned", "spell", "Call the Drowned", { summary: "Bring the drowned up out of the water. Getting them to go back is another matter." });
+  add("stillwater", "spell", "Still Water", { summary: "Calm a stretch of sea the size of a harbour, for one tide." });
   const fill = (key, kind, o) => { for (const [name, v] of Object.entries(o)) E[key].fields[fid(kind, name)] = v; };
   fill("maren", "character", {
     Pronouns: "she/her", Species: "Human", Occupation: "Smuggler", Status: "Alive", Birthplace: E.weir.id,
@@ -105,6 +110,20 @@ function sampleWorld() {
     "Holy days": "The Night of Lamps (the Flood's anniversary)", Temples: [E.gullwatch.id], "Where it's followed": [E.saltmere.id, E.weir.id], Enemies: [E.tidecult.id] });
   fill("tidecult", "religion", { Type: "Mystery cult", Standing: "Secret", "Core beliefs": "The Old Kingdom isn't dead; it's waiting.", Enemies: [E.faith.id], Secrets: "Its head is a Guild master." });
   rel("tidebound", "tidecult", "follows", "");
+  fill("tidecalling", "magic", { "Kind of system": "In between", Source: "The sea itself", "Who can use it": "Anyone the sea answers, which is very few", "How common": "Rare", Standing: "Forbidden",
+    "Users are called": "Tidecallers", "Talent or training": "Both born and learned", "Tied to": [E.crown.id, E.palace.id],
+    "Where the power comes from": "The sea remembers everything that has drowned in it, and a tidecaller borrows that memory.",
+    "How it's done": "Spoken in the old tongue, with salt water on the lips, at the turn of a tide.", Rules: "Only at the turn of the tide\nNever on dry land past sight of the sea\nYou must name what you're asking for",
+    Costs: "A memory of your own, for every working\nThe bigger the working, the dearer the memory", Limits: "Can't touch fresh water\nNothing that never drowned answers",
+    "Weaknesses and counters": "Fire\nA lit lighthouse lamp breaks the call", "How it's learned": "From another tidecaller, mouth to ear. Nothing is written down, by law.",
+    "Notable users": [E.aldra.id, E.tamsin.id], "Who controls it": [E.tidebound.id], Laws: "Tidecalling has been a hanging offence in Saltmere since the Guild's charter.",
+    "The true source": "The memories don't go to the sea. They go to [[Aldra]], who is still down there, and still queen." });
+  const spell = (key, o) => fill(key, "spell", { "Magic system": E.tidecalling.id, ...o });
+  spell("breath", { Tier: "First working", "Casting time": "One held breath", Duration: "While you keep the sea's attention", Cost: "A small memory", Rarity: "Uncommon",
+    "What it does": "You breathe water as easily as air.", Roll: "Concentration: 1d20 + Wis, DC 12 each minute" });
+  spell("callDrowned", { Tier: "Third working", "Casting time": "The whole turn of a tide", Range: "As far as you can see the sea", Cost: "A memory of someone you loved", Rarity: "Lost",
+    "What it does": "1d4 drowned rise and walk toward you. They obey one command.", "Who knows it": [E.tamsin.id], Secrets: "This is how the Drowned at the Weir began." });
+  spell("stillwater", { Tier: "Second working", Range: "A harbour", Duration: "One tide", Cost: "A day's memories", "What it does": "The sea lies flat and silent. Ships can't sail; nothing can drown." });
   fill("drowned", "creature", { Type: "Undead", Size: "Medium", Danger: "Moderate", Appearance: "Swollen, pale, wearing whatever they drowned in.", Behaviour: "They walk inland at low tide, looking for home, and drag the living back with them.", Weaknesses: "Fire\nFresh water", Secrets: "They are all walking toward the Sunken Palace." });
 
   const ev = (title, date, involves, body = "", p = {}) => db.events.push({ id: uid(), title, date, end: null, involves: involves.map(k => E[k].id), body, tags: [], color: "", ...p });

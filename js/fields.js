@@ -77,6 +77,24 @@ const KIND_TEMPLATES = {
     ["Myths", "Origin", "long"], ["Myths", "Great deeds", "long"], ["Myths", "Myths", "long"],
     ["Secrets", "True nature", "long!"], ["Secrets", "Secrets", "long!"],
   ],
+  magic: [
+    ["", "Kind of system", "choice", "Hard (strict rules)|Soft (mysterious)|In between"], ["", "Source", "text"], ["", "Who can use it", "text"],
+    ["", "How common", "choice", "Unheard of|Rare|Uncommon|Common|Everyone"], ["", "Standing", "choice", "Revered|Accepted|Regulated|Feared|Forbidden|Secret"],
+    ["", "Users are called", "text"], ["", "Talent or training", "choice", "Born with it|Learned|Granted by a power|Bargained for|Both born and learned"], ["", "Tied to", "links"],
+    ["How it works", "Where the power comes from", "long"], ["How it works", "How it's done", "long"], ["How it works", "Rules", "list"], ["How it works", "Costs", "list"],
+    ["How it works", "Limits", "list"], ["How it works", "What it can't do", "list"], ["How it works", "Side effects", "long"], ["How it works", "Weaknesses and counters", "list"],
+    ["Learning", "How it's learned", "long"], ["Learning", "Schools and traditions", "list"], ["Learning", "Ranks", "list"], ["Learning", "Where it's taught", "links"],
+    ["Learning", "Notable users", "links"], ["Learning", "Texts and artefacts", "links"],
+    ["In the world", "How it changes society", "long"], ["In the world", "Laws", "long"], ["In the world", "Who controls it", "links"], ["In the world", "History", "long"],
+    ["Secrets", "The true source", "long!"], ["Secrets", "What's been forgotten", "long!"], ["Secrets", "Secrets", "long!"],
+  ],
+  spell: [
+    ["", "Magic system", "link"], ["", "School", "text"], ["", "Tier", "text"], ["", "Casting time", "text"], ["", "Range", "text"], ["", "Duration", "text"],
+    ["", "Components", "text"], ["", "Cost", "text"], ["", "Rarity", "choice", "Common|Uncommon|Rare|Lost|Unique"],
+    ["Effect", "What it does", "long"], ["Effect", "Roll", "text"], ["Effect", "With more power", "long"], ["Effect", "Who knows it", "links"],
+    ["Lore", "Origin", "long"], ["Lore", "Creator", "link"],
+    ["Secrets", "Secrets", "long!"],
+  ],
   creature: [
     ["", "Type", "text"], ["", "Habitat", "text"], ["", "Size", "choice", "Tiny|Small|Medium|Large|Huge|Gargantuan"],
     ["", "Danger", "choice", "Harmless|Low|Moderate|High|Deadly"], ["", "Lifespan", "text"], ["", "Diet", "text"],
@@ -103,10 +121,12 @@ function upgradeKinds(db) {
   if (v < 1) for (const k of db.kinds) addSuggestedFields(k);
   // version 2 brought Religion and Deity; a world that already has kinds by
   // those names keeps its own
-  if (v < 2) for (const k of NEW_KINDS_V2()) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
-  db.fieldsV = 2;
+  // version 3, magic systems and spells
+  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"] };
+  for (const [ver, ids] of Object.entries(added)) if (v < +ver)
+    for (const k of defaultKinds().filter(k => ids.includes(k.id))) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
+  db.fieldsV = 3;
 }
-const NEW_KINDS_V2 = () => defaultKinds().filter(k => k.id === "religion" || k.id === "deity");
 
 // sections in order: the untitled one ("Basics") first, then as they come
 function fieldSections(fields) {

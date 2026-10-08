@@ -113,7 +113,8 @@ addRoute("e", "codex", id => {
       ${t ? `<span class="fam-badge">${t}</span>` : ""}
       <span class="row-tools"><button class="mini" data-act="editRel" data-owner="${from.id}" data-rel="${r.id}" title="Edit">✎</button></span></li>`;
   }).join("");
-  const back = backlinks("e", e.id).filter(b => b.t !== "n" && !(b.t === "e" && rels.some(x => x.from.id === b.it.id)));
+  const pointing = new Set(pointingGroups(e).flatMap(g => g.list));
+  const back = backlinks("e", e.id).filter(b => b.t !== "n" && !(b.t === "e" && (pointing.has(b.it) || rels.some(x => x.from.id === b.it.id))));
   const panels = ENTITY_PANELS.map(p => p(e)).filter(Boolean).join("");
   return `<div class="page entry" style="--c:${entryColor(e)}">
     <div class="entry-head">
@@ -151,6 +152,35 @@ addRoute("e", "codex", id => {
   </div>`;
 });
 
+// "Spells" on a magic system, "Characters (Home)" on a place: entries that
+// point at this one through a link field, gathered by kind and field
+const kindPlural = n => /[^aeiou]y$/i.test(n) ? n.slice(0, -1) + "ies" : /(s|x|ch|sh)$/i.test(n) ? n + "es" : n + "s";
+function pointingGroups(e) {
+  const groups = new Map();
+  for (const o of DB.entries) {
+    if (o === e) continue;
+    for (const f of kindOf(o).fields) if (fieldLinks(f, o.fields?.[f.id]).includes(e.id)) {
+      const k = kindOf(o), key = k.id + "|" + f.id;
+      if (!groups.has(key)) groups.set(key, { k, f, list: [] });
+      groups.get(key).list.push(o);
+    }
+  }
+  return [...groups.values()];
+}
+ENTITY_PANELS.unshift(e => {
+  const groups = pointingGroups(e);
+  const spellField = DB.kinds.find(k => k.id === "spell")?.fields.find(f => f.name === "Magic system");
+  // a magic system always offers to add a spell, even before it has any
+  if (e.kind === "magic" && spellField && !groups.some(g => g.f === spellField)) groups.unshift({ k: byId(DB.kinds, "spell"), f: spellField, list: [] });
+  return groups.map(({ k, f, list }) => `<section class="panel"><div class="panel-h"><h4>${esc(kindPlural(k.name))} <small class="muted">(${esc(f.name)})</small></h4>
+    ${f.type === "link" ? `<button class="btn small" data-act="newLinked" data-kind="${k.id}" data-field="${f.id}" data-to="${e.id}">+ ${esc(k.name)}</button>` : ""}</div>
+    ${list.length ? `<div class="chips">${list.sort((a, b) => a.name.localeCompare(b.name)).map(o => chip("e", o)).join("")}</div>` : `<p class="muted small">None yet.</p>`}</section>`).join("");
+});
+ACT.newLinked = el => {
+  const props = { kind: el.dataset.kind, fields: {} };
+  if (el.dataset.field) props.fields[el.dataset.field] = el.dataset.to;
+  entryEditor(newEntry(props), true);
+};
 function hasStats(e) { const s = e.stats || {}; return e.pc || ["hp", "ac", "init", "speed", "level", "block"].some(k => s[k] !== undefined && s[k] !== ""); }
 function statBlock(e) {
   if (!hasStats(e)) return "";
