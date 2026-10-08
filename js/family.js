@@ -33,7 +33,8 @@ const hasFamily = id => ["parents", "children", "spouses", "siblings"].some(m =>
 const byBirth = (a, b) => dateKey(byId(DB.entries, a)?.start) - dateKey(byId(DB.entries, b)?.start);
 
 ENTITY_PANELS.push(e => {
-  if (!hasFamily(e.id) && e.kind !== "character") return "";
+  // nothing to show yet: the entry page offers "+ Family" in its Add row instead
+  if (!hasFamily(e.id)) return "";
   const row = (label, ids) => ids.length ? `<div class="kv"><span>${label}</span><div class="chips">${ids.sort(byBirth).map(id => chip("e", byId(DB.entries, id))).join("")}</div></div>` : "";
   const body = row("Parents", famGet("parents", e.id)) + row("Spouses", famGet("spouses", e.id)) + row("Siblings", siblingsOf(e.id)) + row("Children", famGet("children", e.id));
   return `<section class="panel"><div class="panel-h"><h4>Family</h4>

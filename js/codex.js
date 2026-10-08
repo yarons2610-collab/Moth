@@ -50,27 +50,39 @@ const lifespan = e => {
 };
 
 /* ── the codex list ── */
+const SORTS = { az: "A to Z", recent: "Recently changed", born: "Oldest first (in the world)" };
 addRoute("codex", "codex", kind => {
   if (kind !== undefined) CODEX.kind = kind;
+  CODEX.sort ||= "az";
   const q = norm(CODEX.q);
+  const sorter = { az: (a, b) => a.name.localeCompare(b.name), recent: (a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0),
+    born: (a, b) => dateKey(a.start) - dateKey(b.start) || a.name.localeCompare(b.name) }[CODEX.sort];
   const list = DB.entries.filter(e =>
     (!CODEX.kind || e.kind === CODEX.kind) &&
     (!CODEX.tag || (e.tags || []).includes(CODEX.tag)) &&
     (!q || [e.name, ...(e.aliases || []), e.summary, ...(e.tags || [])].some(s => norm(s).includes(q)))
-  ).sort((a, b) => a.name.localeCompare(b.name));
+  ).sort(sorter);
   const counts = k => DB.entries.filter(e => e.kind === k).length;
+  // "All" is grouped by kind, in the kinds' own order, so it reads like a contents page
+  const groups = CODEX.kind ? [[null, list]] : DB.kinds.map(k => [k, list.filter(e => e.kind === k.id)]).filter(([, l]) => l.length)
+    .concat([[{ id: "", name: "Other", icon: "◆" }, list.filter(e => !byId(DB.kinds, e.kind))]].filter(([, l]) => l.length));
   return `<div class="page">
     <div class="page-h"><h2>Codex</h2><div class="spacer"></div>
       ${searchBox("codexFilter", CODEX.q, "Filter the codex…")}
+      <select data-change="codexSort" title="Order">${Object.entries(SORTS).map(([k, l]) => `<option value="${k}" ${k === CODEX.sort ? "selected" : ""}>${l}</option>`).join("")}</select>
       <button class="btn accent" data-act="newEntry" data-kind="${CODEX.kind}">+ New ${esc(CODEX.kind ? byId(DB.kinds, CODEX.kind)?.name || "entry" : "entry")}</button></div>
     <div class="chips-row">
       <a class="fchip ${!CODEX.kind ? "on" : ""}" href="#/codex/">All <small>${DB.entries.length}</small></a>
-      ${DB.kinds.map(k => `<a class="fchip ${CODEX.kind === k.id ? "on" : ""}" href="#/codex/${k.id}" style="--c:${k.color}">${k.icon} ${esc(k.name)} <small>${counts(k.id)}</small></a>`).join("")}
+      ${DB.kinds.map(k => { const n = counts(k.id); return `<a class="fchip ${CODEX.kind === k.id ? "on" : ""} ${n ? "" : "none"}" href="#/codex/${k.id}" style="--c:${k.color}">${k.icon} ${esc(k.name)} <small>${n}</small></a>`; }).join("")}
       ${CODEX.tag ? `<button class="fchip on" data-act="codexTag" data-tag="">#${esc(CODEX.tag)} ✕</button>` : ""}
     </div>
-    <div class="cards" id="codexCards">${list.map(entryCard).join("") || empty(DB.entries.length ? "Nothing matches." : "The codex is empty. Add a first character, place or legend.")}</div>
+    ${list.length ? groups.map(([k, l]) => `${k ? `<h3 class="codex-group" style="--c:${k.color || "var(--ink-dim)"}"><a href="#/codex/${k.id}">${k.icon} ${esc(kindPlural(k.name))}</a> <small>${l.length}</small>
+        <button class="btn small ghost" data-act="newEntry" data-kind="${k.id}">+ ${esc(k.name)}</button></h3>` : ""}
+      <div class="cards">${l.map(entryCard).join("")}</div>`).join("")
+      : empty(DB.entries.length ? "Nothing matches." : "The codex is empty. Add a first character, place or legend.")}
   </div>`;
 });
+ACT.codexSort = el => { CODEX.sort = el.value; rerender(); };
 function entryCard(e) {
   const k = kindOf(e);
   return `<a class="card" href="#/e/${e.id}" style="--c:${entryColor(e)}">
@@ -116,39 +128,46 @@ addRoute("e", "codex", id => {
   const pointing = new Set(pointingGroups(e).flatMap(g => g.list));
   const back = backlinks("e", e.id).filter(b => b.t !== "n" && !(b.t === "e" && (pointing.has(b.it) || rels.some(x => x.from.id === b.it.id))));
   const panels = ENTITY_PANELS.map(p => p(e)).filter(Boolean).join("");
+  const notes = notesPanel("e", e.id, { hideEmpty: true });
+  const quick = [!relHtml && `<button class="btn small" data-act="addRel" data-id="${e.id}">+ Relationship</button>`,
+    e.kind === "character" && !hasFamily(e.id) && `<button class="btn small" data-act="addKin" data-id="${e.id}" data-as="parent">+ Family</button>`,
+    !notes && `<button class="btn small" data-act="noteFor" data-k="e:${e.id}">+ Note</button>`].filter(Boolean);
+  // a header across the top, an infobox (picture, basics, stats) on the right,
+  // and the article and everything else in the main column; boxes with
+  // nothing in them wait in the "Add" row at the end instead
   return `<div class="page entry" style="--c:${entryColor(e)}">
-    <div class="entry-head">
-      <button class="portrait" data-act="setPortrait" data-id="${e.id}" title="Change the picture">${e.portrait ? assetImg(e.portrait) : `<span>${k.icon}</span><small>Add picture</small>`}</button>
-      <div class="entry-title">
-        <div class="kind-line"><a href="#/codex/${k.id}">${k.icon} ${esc(k.name)}</a>${e.pc ? ` <span class="pc-badge">Player character</span>` : ""}</div>
-        <h2>${esc(e.name)}</h2>
-        ${(e.aliases || []).length ? `<div class="aliases">also ${e.aliases.map(esc).join(", ")}</div>` : ""}
-        ${lifespan(e) ? `<div class="life">${esc(lifespan(e))}</div>` : ""}
-        ${e.summary ? `<p class="summary">${inline(e.summary)}</p>` : ""}
-        <div class="tags">${(e.tags || []).map(t => `<a class="tag" data-act="codexTag" data-tag="${esc(t)}">#${esc(t)}</a>`).join("")}</div>
+   <div class="entry-layout">
+    <header class="entry-top">
+      <div class="entry-topline"><div class="kind-line"><a href="#/codex/${k.id}">${k.icon} ${esc(k.name)}</a>${e.pc ? ` <span class="pc-badge">Player character</span>` : ""}</div>
+        <div class="entry-actions">
+          <button class="btn" data-act="screenEntry" data-id="${e.id}" title="Show the players this entry's picture and name">📺</button>
+          <button class="btn accent" data-act="editEntry" data-id="${e.id}">Edit</button>
+          <button class="btn ghost" data-act="deleteEntry" data-id="${e.id}" title="Delete">🗑</button>
+        </div></div>
+      <h2>${esc(e.name)}</h2>
+      ${(e.aliases || []).length ? `<div class="aliases">also ${e.aliases.map(esc).join(", ")}</div>` : ""}
+      ${lifespan(e) ? `<div class="life">${esc(lifespan(e))}</div>` : ""}
+      ${e.summary ? `<p class="summary">${inline(e.summary)}</p>` : ""}
+      ${(e.tags || []).length ? `<div class="tags">${e.tags.map(t => `<a class="tag" data-act="codexTag" data-tag="${esc(t)}">#${esc(t)}</a>`).join("")}</div>` : ""}
+    </header>
+    <aside class="entry-side">
+      <div class="infobox">
+        <button class="portrait ${e.portrait ? "has-pic" : ""}" data-act="setPortrait" data-id="${e.id}" title="Change the picture">${e.portrait ? assetImg(e.portrait) : `<span>${k.icon}</span><small>Add a picture</small>`}</button>
+        ${fields ? `<div class="kvs">${fields}</div>` : ""}
+        ${emptyCount ? `<a class="fill-hint" data-act="editEntry" data-id="${e.id}">+ ${plural(emptyCount, "detail")} to fill in</a>` : ""}
       </div>
-      <div class="entry-actions">
-        <button class="btn" data-act="screenEntry" data-id="${e.id}" title="Show the players this entry's picture and name">📺</button>
-        <button class="btn accent" data-act="editEntry" data-id="${e.id}">Edit</button>
-        <button class="btn ghost" data-act="deleteEntry" data-id="${e.id}" title="Delete">🗑</button>
-      </div>
+      ${statBlock(e)}
+    </aside>
+    <div class="entry-main">
+      ${mdBlock(e.body, `<p class="empty">No article yet. <a data-act="editEntry" data-id="${e.id}">Write one</a>, using [[Name]] to link.</p>`)}
+      ${sections}
+      ${relHtml ? `<section class="panel"><div class="panel-h"><h4>Relationships</h4><button class="btn small" data-act="addRel" data-id="${e.id}">+ Add</button></div><ul class="rels">${relHtml}</ul></section>` : ""}
+      ${panels}
+      ${notes}
+      ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it, b.label !== "mentions" ? ` <small>${esc(b.label)}</small>` : "")).join("")}</div></section>` : ""}
+      ${quick.length ? `<div class="entry-quick"><span class="muted small">Add:</span>${quick.join("")}</div>` : ""}
     </div>
-    <div class="entry-grid">
-      <div class="col-main">
-        ${mdBlock(e.body, `<p class="empty">No article yet. <a data-act="editEntry" data-id="${e.id}">Write one</a>, using [[Name]] to link.</p>`)}
-        ${sections}
-        <section class="panel"><div class="panel-h"><h4>Relationships</h4><button class="btn small" data-act="addRel" data-id="${e.id}">+ Add</button></div>
-          ${relHtml ? `<ul class="rels">${relHtml}</ul>` : empty("No relationships yet.")}</section>
-        ${panels}
-        ${notesPanel("e", e.id)}
-        ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it, b.label !== "mentions" ? ` <small>${esc(b.label)}</small>` : "")).join("")}</div></section>` : ""}
-      </div>
-      <div class="col-side">
-        <section class="panel">${fields ? `<div class="kvs">${fields}</div>` : ""}
-          ${emptyCount ? `<a class="fill-hint" data-act="editEntry" data-id="${e.id}">${fields ? "+ " : ""}${plural(emptyCount, "detail")} to fill in</a>` : ""}</section>
-        ${statBlock(e)}
-      </div>
-    </div>
+   </div>
   </div>`;
 });
 
@@ -249,7 +268,7 @@ function entryEditor(e, isNew) {
         } catch (err) { toast(err.message); return false; }
         Object.assign(e, {
           name: v.name.trim(), kind: k.id, summary: v.summary.trim(), aliases: splitList(v.aliases), tags: splitList(v.tags),
-          body: v.body, color: v.color, start: dates.start, end: dates.end, pc: v.pc, fields,
+          body: v.body, color: v.color, start: dates.start, end: dates.end, pc: v.pc, fields, updated: Date.now(),
           extra: $$(".extra-row", w).map(r => ({ name: $(".x-name", r).value.trim(), value: $(".x-value", r).value.trim() })).filter(x => x.name || x.value),
         });
         const st = {};

@@ -72,6 +72,8 @@ function sampleWorld() {
   add("breath", "spell", "Breath of the Deep", { summary: "Breathe water for as long as you hold the sea's attention." });
   add("callDrowned", "spell", "Call the Drowned", { summary: "Bring the drowned up out of the water. Getting them to go back is another matter." });
   add("stillwater", "spell", "Still Water", { summary: "Calm a stretch of sea the size of a harbour, for one tide." });
+  add("lumenish", "language", "Old Lumenish", { summary: "The court tongue of the Old Kingdom. Spoken now only in prayers, and by tidecallers.", color: "#5fc9c4" });
+  add("saltfolk", "culture", "The Saltfolk", { summary: "The people of Saltmere and the Weir: wreckers' grandchildren, divers, debtors.", color: "#e58fb0" });
   const fill = (key, kind, o) => { for (const [name, v] of Object.entries(o)) E[key].fields[fid(kind, name)] = v; };
   fill("maren", "character", {
     Pronouns: "she/her", Species: "Human", Occupation: "Smuggler", Status: "Alive", Birthplace: E.weir.id,
@@ -124,6 +126,18 @@ function sampleWorld() {
   spell("callDrowned", { Tier: "Third working", "Casting time": "The whole turn of a tide", Range: "As far as you can see the sea", Cost: "A memory of someone you loved", Rarity: "Lost",
     "What it does": "1d4 drowned rise and walk toward you. They obey one command.", "Who knows it": [E.tamsin.id], Secrets: "This is how the Drowned at the Weir began." });
   spell("stillwater", { Tier: "Second working", Range: "A harbour", Duration: "One tide", Cost: "A day's memories", "What it does": "The sea lies flat and silent. Ships can't sail; nothing can drown." });
+  fill("lumenish", "language", { "Spoken by": [E.tidecalling.id], Speakers: "A few hundred, none of them fluent", Status: "Sacred only", Script: "Lumen hand (knotted strokes)", Writing: "Right to left",
+    "Sounds like": "Soft and long-voweled, like a tide going out", "Sounds it has": "l, m, n, r, s, th, v, and long vowels", "Sounds it never has": "k, g, hard stops at the end of a word",
+    Syllables: "ae\nal\nlu\nmen\nor\nsa\nthe\nvar\nil\nri\nos\nma\nlen\ndra\ne", "Name endings": "iel\nora\nen\nis",
+    "Word order": "Verb subject object", "How it works": "Nouns have a 'drowned' form, used for anything taken by the sea.",
+    Lexicon: "aldra = the one who stays\nlumen = light kept for others\nmaren = sea-found\nthal = tide\nossa = memory\nvar = to ask\nsael = salt\nrien = crown, circle",
+    Phrases: "Var thal ossa = the tide asks a memory (the tidecaller's warning)\nLumen a maren = a light for the sea-found (a blessing)",
+    "Sample names": "Aldra\nMaren\nOsseliel\nThalora", "Related languages": [], "Hidden meanings": "Maren's name means 'sea-found'. Her mother knew exactly what she was naming her." });
+  fill("saltfolk", "culture", { Peoples: "Mostly human, with old Lumen blood", Homeland: [E.saltmere.id, E.weir.id], Languages: [E.lumenish.id], Religions: [E.faith.id], Values: "Debts get paid\nThe sea is owed respect\nFamily before Guild",
+    "Food and drink": "Salt fish, kelp bread, bitter black ale.", Clothing: "Oilskins and wool; a diver's knife on every belt.", "Names and naming": "A child gets a sea-name at their first low tide, used only by family.",
+    "Death and burial": "The dead go back to the sea at the next ebb, with a lamp on their chest.", Festivals: "The Night of Lamps\nFirst Ebb", Greetings: "“Fair tide.” Answer: “And a light to come home by.”",
+    Taboos: "Whistling on the water\nSaying a drowned person's name before the next tide", Sayings: "The sea gives back. It just doesn't say when.\nA debt is a rope: it holds you up or it holds you down.",
+    "How they see outsiders": "Dry-landers: useful, gullible, never to be trusted near a boat." });
   fill("drowned", "creature", { Type: "Undead", Size: "Medium", Danger: "Moderate", Appearance: "Swollen, pale, wearing whatever they drowned in.", Behaviour: "They walk inland at low tide, looking for home, and drag the living back with them.", Weaknesses: "Fire\nFresh water", Secrets: "They are all walking toward the Sunken Palace." });
 
   const ev = (title, date, involves, body = "", p = {}) => db.events.push({ id: uid(), title, date, end: null, involves: involves.map(k => E[k].id), body, tags: [], color: "", ...p });

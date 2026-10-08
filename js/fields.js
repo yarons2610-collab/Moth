@@ -9,7 +9,7 @@
 
 const FIELD_TYPES = {
   text: "Short text", long: "Long text", list: "List (one per line)", number: "Number", date: "World date",
-  choice: "Choice", yesno: "Yes / no", link: "Link to an entry", links: "Links to entries",
+  choice: "Choice", yesno: "Yes / no", link: "Link to an entry", links: "Links to entries", glossary: "Word list (word = meaning)",
 };
 
 /* Suggested templates for the starting kinds: [section, name, type, choices].
@@ -95,6 +95,26 @@ const KIND_TEMPLATES = {
     ["Lore", "Origin", "long"], ["Lore", "Creator", "link"],
     ["Secrets", "Secrets", "long!"],
   ],
+  language: [
+    ["", "Spoken by", "links"], ["", "Speakers", "text"], ["", "Status", "choice", "Living|Spreading|Dying|Dead|Sacred only|Secret|Trade tongue"],
+    ["", "Descended from", "link"], ["", "Script", "text"], ["", "Writing", "choice", "Left to right|Right to left|Top to bottom|Boustrophedon|Not written"], ["", "Sounds like", "text"],
+    ["Sounds", "Sounds it has", "text"], ["Sounds", "Sounds it never has", "text"], ["Sounds", "Syllables", "list"], ["Sounds", "Name endings", "list"],
+    ["Grammar", "Word order", "choice", "Subject verb object|Subject object verb|Verb subject object|Free"], ["Grammar", "How it works", "long"], ["Grammar", "Counting", "long"],
+    ["Words", "Lexicon", "glossary"], ["Words", "Phrases", "glossary"], ["Words", "Sample names", "list"],
+    ["In use", "Dialects", "list"], ["In use", "Where it's spoken", "links"], ["In use", "Related languages", "links"], ["In use", "Borrowed words", "long"], ["In use", "Who learns it", "long"],
+    ["Secrets", "Hidden meanings", "long!"],
+  ],
+  culture: [
+    ["", "Peoples", "text"], ["", "Homeland", "links"], ["", "Languages", "links"], ["", "Religions", "links"], ["", "Population", "text"], ["", "Values", "list"],
+    ["Daily life", "Food and drink", "long"], ["Daily life", "Clothing", "long"], ["Daily life", "Homes and buildings", "long"], ["Daily life", "Family and kinship", "long"],
+    ["Daily life", "Names and naming", "long"], ["Daily life", "Coming of age", "long"], ["Daily life", "Marriage", "long"], ["Daily life", "Death and burial", "long"],
+    ["Society", "Social order", "long"], ["Society", "Roles of men and women", "long"], ["Society", "Law and justice", "long"], ["Society", "Work and trade", "long"],
+    ["Society", "War", "long"], ["Society", "Learning", "long"],
+    ["Arts", "Art and craft", "long"], ["Arts", "Music and dance", "long"], ["Arts", "Stories and heroes", "long"], ["Arts", "Festivals", "list"], ["Arts", "Games and sport", "text"],
+    ["Manners", "Greetings", "text"], ["Manners", "Hospitality", "long"], ["Manners", "Taboos", "list"], ["Manners", "Insults", "list"], ["Manners", "Sayings", "list"],
+    ["Others", "Allies", "links"], ["Others", "Rivals", "links"], ["Others", "How they see outsiders", "long"], ["Others", "How outsiders see them", "long"],
+    ["Secrets", "Secrets", "long!"],
+  ],
   creature: [
     ["", "Type", "text"], ["", "Habitat", "text"], ["", "Size", "choice", "Tiny|Small|Medium|Large|Huge|Gargantuan"],
     ["", "Danger", "choice", "Harmless|Low|Moderate|High|Deadly"], ["", "Lifespan", "text"], ["", "Diet", "text"],
@@ -122,10 +142,10 @@ function upgradeKinds(db) {
   // version 2 brought Religion and Deity; a world that already has kinds by
   // those names keeps its own
   // version 3, magic systems and spells
-  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"] };
+  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"], 4: ["language", "culture"] };
   for (const [ver, ids] of Object.entries(added)) if (v < +ver)
     for (const k of defaultKinds().filter(k => ids.includes(k.id))) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
-  db.fieldsV = 3;
+  db.fieldsV = 4;
 }
 
 // sections in order: the untitled one ("Basics") first, then as they come
@@ -146,6 +166,7 @@ function fieldInput(f, v) {
     case "date": return dateField(label, n, v || null);
     case "long": return field(label, `<textarea name="${n}" rows="3">${esc(v || "")}</textarea>`, "span2");
     case "list": return field(label, `<textarea name="${n}" rows="3" placeholder="One per line">${esc(v || "")}</textarea>`, "span2");
+    case "glossary": return field(label, `<textarea name="${n}" rows="5" placeholder="One per line: word = meaning">${esc(v || "")}</textarea>`, "span2");
     case "choice": return field(label, `<select name="${n}"><option value="">—</option>${(f.opts || []).map(o => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}${v && !(f.opts || []).includes(v) ? `<option selected>${esc(v)}</option>` : ""}</select>`);
     case "yesno": return `<label class="check fld"><input type="checkbox" name="${n}" ${v ? "checked" : ""}> ${label}</label>`;
     case "number": return textField(label, n, v ?? "", `type="number" step="any"`);
@@ -160,7 +181,7 @@ function readField(f, raw) {
   if (!s) return undefined;
   if (f.type === "number") return isNaN(+s) ? s : +s;
   if (f.type === "date") { const d = parseDate(s); if (!d) throw new Error(`“${s}” isn't a date I can read`); return d; }
-  return f.type === "long" || f.type === "list" ? String(raw).trim() : s;
+  return ["long", "list", "glossary"].includes(f.type) ? String(raw).trim() : s;
 }
 // how a value reads on an entry's page
 function fieldShow(f, v) {
@@ -170,10 +191,49 @@ function fieldShow(f, v) {
     case "date": return esc(fmtDate(v));
     case "yesno": return v ? "Yes" : "No";
     case "long": return `<div class="prose">${md(v)}</div>`;
+    case "glossary": {
+      const rows = glossaryRows(v);
+      return `<div class="glossary">${rows.length > 6 ? `<input type="search" class="gloss-search" placeholder="Look up a word…" data-input="glossSearch">` : ""}
+        <table>${rows.map(([w, m]) => `<tr><td class="gw">${esc(w)}</td><td>${inline(m)}</td></tr>`).join("")}</table></div>`;
+    }
     case "list": return `<ul class="field-list">${String(v).split("\n").map(l => l.trim()).filter(Boolean).map(l => `<li>${inline(l.replace(/^[-*•]\s*/, ""))}</li>`).join("")}</ul>`;
     case "number": return esc(typeof v === "number" ? v.toLocaleString() : v);
     default: return inline(String(v));
   }
 }
-const fieldText = (f, v) => f.type === "text" || f.type === "long" || f.type === "list" || f.type === "choice" ? String(v ?? "") : "";
+const fieldText = (f, v) => ["text", "long", "list", "choice", "glossary"].includes(f.type) ? String(v ?? "") : "";
+// "word = meaning" (or "word: meaning", "word - meaning"), one per line
+const glossaryRows = v => String(v || "").split("\n").map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^(.+?)\s*(?:=|:|\s[-–—]\s)\s*(.*)$/); return m ? [m[1], m[2]] : [l, ""]; });
+ACT.glossSearch = el => {
+  const q = norm(el.value);
+  for (const tr of $$("tr", el.parentElement)) tr.hidden = !!q && !norm(tr.textContent).includes(q);
+};
+
+/* ── a name generator, for any entry with a Syllables field (languages) ──
+   names of two or three syllables, sometimes with one of its name endings */
+function makeNames(syl, ends, n = 12) {
+  const out = new Set(), pick = a => a[Math.floor(Math.random() * a.length)];
+  for (let tries = 0; out.size < n && tries < n * 20; tries++) {
+    let w = "";
+    const k = Math.random() < 0.55 ? 2 : 3;
+    for (let i = 0; i < k; i++) w += pick(syl);
+    if (ends.length && Math.random() < 0.5) w += pick(ends);
+    w = w.toLowerCase().replace(/(.)\1\1+/g, "$1$1").replace(/['’-]{2,}/g, "'");
+    // nothing a mouth trips on: no three vowels or three consonants in a row
+    if (w.length < 3 || w.length > 14 || /[aeiouy]{3}/.test(w) || /[^aeiouy'\s-]{4}/.test(w)) continue;
+    out.add(w[0].toUpperCase() + w.slice(1));
+  }
+  return [...out];
+}
+const sylOf = (e, name) => { const f = kindOf(e).fields.find(f => norm(f.name) === name); return f ? String(e.fields?.[f.id] || "").split(/[\n,]+/).map(s => s.trim().replace(/^-|-$/g, "")).filter(Boolean) : []; };
+ENTITY_PANELS.push(e => {
+  const syl = sylOf(e, "syllables");
+  if (syl.length < 3) return kindOf(e).fields.some(f => norm(f.name) === "syllables") ? `<section class="panel"><div class="panel-h"><h4>Name generator</h4></div>
+    <p class="muted small">Fill in at least three Syllables (one per line) and this makes names that sound like ${esc(e.name)}.</p></section>` : "";
+  return `<section class="panel namegen"><div class="panel-h"><h4>Name generator</h4><button class="btn small" data-act="genNames" data-id="${e.id}">↻ More</button></div>
+    <div class="gen-names" id="genNames">${namesHtml(e)}</div><p class="muted small">Tap a name to copy it.</p></section>`;
+});
+const namesHtml = e => makeNames(sylOf(e, "syllables"), sylOf(e, "name endings")).map(n => `<button class="chip gen-name" data-act="copyName" data-v="${esc(n)}">${esc(n)}</button>`).join("");
+ACT.genNames = el => { $("#genNames").innerHTML = namesHtml(byId(DB.entries, el.dataset.id)); };
+ACT.copyName = el => { navigator.clipboard?.writeText(el.dataset.v).then(() => toast(`Copied “${el.dataset.v}”`), () => toast(el.dataset.v)); };
 const fieldLinks = (f, v) => f.type === "link" ? (v ? [v] : []) : f.type === "links" ? (Array.isArray(v) ? v : v ? [v] : []) : [];

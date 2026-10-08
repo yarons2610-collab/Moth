@@ -45,6 +45,8 @@ function defaultKinds() {
     k("deity", "Deity", "✨", "#f6d97a", "First worshipped", "Died"),
     k("magic", "Magic system", "🔮", "#9b7cf0", "Discovered", "Lost"),
     k("spell", "Spell", "🪄", "#c3a6ff", "First cast", "Forgotten"),
+    k("language", "Language", "🗣️", "#5fc9c4", "First spoken", "Last spoken"),
+    k("culture", "Culture", "🎭", "#e58fb0", "Emerged", "Faded"),
     k("creature", "Creature", "🐉", "#f2a6c8", "First seen", "Gone"),
   ];
 }
@@ -55,7 +57,7 @@ function normalizeDB(d) {
   d.world = Object.assign({ name: "Untitled world", eras: [{ id: uid(), name: "First Age", abbr: "FA", start: 1 }], months: [], now: { y: 1 } }, d.world || {});
   if (!d.world.eras.length) d.world.eras = [{ id: uid(), name: "Age", abbr: "", start: 1 }];
   for (const k of DB_ARRAYS) if (!Array.isArray(d[k])) d[k] = [];
-  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 3; }
+  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 4; }
   upgradeKinds(d);
   d.party ??= null;
   d.combat ??= null;

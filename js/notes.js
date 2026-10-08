@@ -19,10 +19,11 @@ linkType("n", {
 const noteLinks = n => (n.links || []).map(k => { const i = k.indexOf(":"), t = k.slice(0, i), it = lookup(t, k.slice(i + 1)); return it && { t, it, k }; }).filter(Boolean);
 
 // the notes about a thing: linked to it, or mentioning it in their text
-function notesPanel(t, id) {
+function notesPanel(t, id, { hideEmpty = false } = {}) {
   const it = lookup(t, id);
   if (!it) return "";
   const notes = backlinks(t, id).filter(b => b.t === "n").map(b => b.it).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  if (hideEmpty && !notes.length) return "";
   return `<section class="panel notes-panel"><div class="panel-h"><h4>Notes</h4><button class="btn small" data-act="noteFor" data-k="${t}:${id}">+ Note</button></div>
     ${notes.length ? `<div class="list">${notes.map(n => `<a class="row-card" href="#/note/${n.id}"><b>🗒 ${esc(n.title)}</b><small>${esc(plainLinks(n.body).slice(0, 90))}</small></a>`).join("")}</div>` : `<p class="muted small">No notes about it yet.</p>`}</section>`;
 }

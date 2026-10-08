@@ -570,6 +570,45 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .note-on { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 6px; }
 .note-on .chip { font-size: 11.5px; padding: 1px 7px; }
 
+/* word lists and the name generator */
+.glossary table { border-collapse: collapse; width: 100%; }
+.glossary td { padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.glossary tr[hidden] { display: none; }
+.glossary .gw { font-family: var(--serif); font-style: italic; font-weight: 600; color: var(--accent); white-space: nowrap; width: 1%; padding-right: 16px; }
+.gloss-search { margin-bottom: 6px; max-width: 260px; }
+.gen-names { display: flex; flex-wrap: wrap; gap: 4px; }
+.gen-name { --c: #5fc9c4; font-family: var(--serif); font-size: 14px; cursor: pointer; }
+
+/* the entry page: header, infobox on the right, main column */
+.entry-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "top side" "main side"; gap: 0 28px; align-items: start; }
+.entry-top { grid-area: top; margin-bottom: 18px; }
+.entry-side { grid-area: side; display: flex; flex-direction: column; gap: 14px; }
+.entry-main { grid-area: main; min-width: 0; }
+.entry-topline { display: flex; align-items: center; gap: 10px; }
+.entry-topline .entry-actions { margin-left: auto; }
+.entry-top h2 { font-size: 32px; margin-top: 2px; }
+.infobox { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.infobox .portrait { width: 100%; height: 110px; border-radius: 10px; box-shadow: none; border-style: dashed; flex-direction: row; gap: 10px; }
+.infobox .portrait span { font-size: 30px; }
+.infobox .portrait.has-pic { height: auto; aspect-ratio: 1; border-style: solid; }
+.infobox .kvs .kv { grid-template-columns: 100px 1fr; }
+.infobox .fill-hint { margin-top: 0; }
+.entry-quick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 4px 0 10px; }
+@media (max-width: 860px) {
+  .entry-layout { grid-template-columns: 1fr; grid-template-areas: "top" "side" "main"; }
+  .entry-side { margin-bottom: 14px; }
+  .infobox .portrait.has-pic { max-width: 220px; align-self: center; }
+}
+
+/* the codex list, grouped by kind */
+.fchip.none { opacity: .45; }
+.fchip.none:hover, .fchip.none.on { opacity: 1; }
+.codex-group { display: flex; align-items: baseline; gap: 8px; margin: 22px 0 10px; font-size: 15px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.codex-group:first-of-type { margin-top: 4px; }
+.codex-group a { color: var(--c); }
+.codex-group small { color: var(--ink-faint); font: 12px var(--mono); }
+.codex-group .btn { margin-left: auto; }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }
