@@ -90,6 +90,7 @@ addRoute("map", "map", (id, focusPin) => {
       <select data-change="mapJump" title="Go to another map">${DB.maps.map(x => `<option value="${x.id}" ${x === m ? "selected" : ""}>🗺 ${esc(x.name)}</option>`).join("")}</select>
       <div class="tool-group">${tools.map(([t, i, l, tip]) => `<button class="tool ${MAPV.tool === t ? "on" : ""}" data-act="mapTool" data-t="${t}" title="${tip}">${i}<span>${l}</span></button>`).join("")}</div>
       ${MAPV.tool === "region" ? `<span class="hint">${MAPV.draft.length < 3 ? "Tap to add corners" : `<button class="btn small accent" data-act="finishRegion">Finish region</button>`} <button class="btn small ghost" data-act="cancelDraft">Cancel</button></span>` : ""}
+      <button class="btn small" data-act="drawOpen" data-kind="map" data-id="${m.id}" title="Draw on this map">✏ Draw</button>
       ${MAPV.movePin ? `<span class="hint">Tap where the pin should go <button class="btn small ghost" data-act="cancelMove">Cancel</button></span>` : ""}
       <div class="spacer"></div>
       <button class="btn small ${screenIs("map", m.id) ? "live" : ""}" data-act="screenMap" data-id="${m.id}" title="Put this map on the player screen (secret pins stay hidden)">📺 ${screenIs("map", m.id) ? "On screen" : "Show players"}</button>
@@ -101,7 +102,7 @@ addRoute("map", "map", (id, focusPin) => {
       ${MAPV.year != null && MAPV.year !== NOW().y ? `<button class="btn small ghost" data-act="mapYearNow">Back to now</button>` : ""}</div>
     <div class="map-body">
       <div class="map-stage tool-${MAPV.tool}" id="mapStage">
-        <div class="map-layer" id="mapLayer" style="width:${m.w}px;height:${m.h}px">${mapBg(m)}
+        <div class="map-layer" id="mapLayer" style="width:${m.w}px;height:${m.h}px">${mapBg(m)}${drawingHtml(m.draw, { w: m.w, h: m.h })}
           <svg class="map-svg" viewBox="0 0 ${m.w} ${m.h}" width="${m.w}" height="${m.h}">${regions}${MAP_OVERLAYS.map(f => f(m)).join("")}${draft}</svg>${regionLabels}${pins}${party}</div>
         <div class="zoom-btns"><button data-act="mapZoom" data-k="1.4">+</button><button data-act="mapZoom" data-k="0.7">−</button><button data-act="mapFit" title="Fit">⤢</button></div>
       </div>
@@ -152,8 +153,11 @@ function panZoom(stage, layer, w, h, v, opts = {}) {
     const k = Math.min(stage.clientWidth / w, stage.clientHeight / h) * 0.96;
     return { k, x: (stage.clientWidth - w * k) / 2, y: (stage.clientHeight - h * k) / 2 };
   };
-  // a view kept from a stage of another size (a rotated phone, another page) starts over
-  if (!v || v.sw !== stage.clientWidth || v.sh !== stage.clientHeight) v = Object.assign(v || {}, fit());
+  // A view kept from a much wider or narrower stage (a rotated phone, another
+  // page) starts over; a small change keeps the zoom and the middle in place.
+  const cw = stage.clientWidth, ch = stage.clientHeight;
+  if (!v || !v.sw || Math.abs(v.sw - cw) / v.sw > 0.2) v = Object.assign(v || {}, fit());
+  else { v.x += (cw - v.sw) / 2; v.y += (ch - v.sh) / 2; }
   v.sw = stage.clientWidth; v.sh = stage.clientHeight;
   const apply = () => { layer.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.k})`; layer.style.setProperty("--ik", 1 / v.k); };
   const zoomAt = (f, sx, sy) => {
@@ -285,6 +289,7 @@ function pinEditor(m, pin, isNew) {
       readPlace(v, pin);
       if (v.map === "__new") {
         const child = await createMap(pin.label || byId(DB.entries, pin.entry)?.name || "New map");
+        if (child) delete child.drawNow;
         pin.map = child?.id || "";
       } else pin.map = v.map;
       if (isNew) m.pins.push(pin);
@@ -318,6 +323,7 @@ function createMap(name) {
       body: `${textField("Name", "name", name || "")}<p class="muted">Start from an image (a drawn map, a scan, a screenshot), or on blank parchment to sketch with pins and regions.</p>`,
       onClose: () => res(made),
       buttons: [{ label: "Blank parchment", act: w => { made = addMap(formVals(w).name, null); } },
+        { label: "✏ Draw it", act: w => { made = addMap(formVals(w).name, null); made.drawNow = true; } },
         { label: "Upload image…", cls: "accent", act: async (w, api) => {
           const nm = formVals(w).name;
           const img = await pickImage(4096);
@@ -333,12 +339,19 @@ function addMap(name, img) {
   save();
   return m;
 }
-ACT.newMap = async () => { const m = await createMap(""); if (m) go("#/map/" + m.id); };
+ACT.newMap = async () => {
+  MODALS.forEach(x => x.close());
+  const m = await createMap("");
+  if (!m) return;
+  if (m.drawNow) { delete m.drawNow; return openDrawing("map", m.id); }
+  go("#/map/" + m.id);
+};
 ACT.mapMenu = el => {
   const m = byId(DB.maps, el.dataset.id);
   modal({ title: m.name,
     body: `${textField("Name", "name", m.name)}${areaField("Notes", "notes", m.notes, 3)}
-      <div class="btn-row"><button class="btn" data-act="mapImage" data-id="${m.id}">${m.asset ? "Replace image" : "Use an image"}</button>
+      <div class="btn-row"><button class="btn accent" data-act="drawOpen" data-kind="map" data-id="${m.id}">✏ ${m.draw ? "Edit the drawing" : "Draw on it"}</button>
+      <button class="btn" data-act="mapImage" data-id="${m.id}">${m.asset ? "Replace image" : "Use an image"}</button>
       ${m.asset ? `<button class="btn" data-act="mapParchment" data-id="${m.id}">Switch to parchment</button>` : ""}
       <button class="btn" data-act="newMap">+ New map</button></div>`,
     buttons: [{ label: "Delete map", cls: "danger", act: () => { ACT.mapDelete(m); } }, { label: "Save", cls: "accent", act: w => {

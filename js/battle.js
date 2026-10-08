@@ -19,6 +19,12 @@ const TOKEN_SIZES = { 0.5: "Tiny", 1: "Small or Medium", 2: "Large", 3: "Huge", 
 const foeId = f => f.id ||= uid();
 const initials = name => String(name).split(/\s+/).filter(w => /\w/.test(w)).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
 const battleCombat = x => DB.combat && DB.combat.enc === x.id ? DB.combat : null;
+// every square on the line between two squares, so a quick drag skips none
+function cellsBetween(a, b) {
+  const n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)), out = [];
+  for (let i = 1; i <= n; i++) out.push({ x: Math.round(a.x + (b.x - a.x) * i / n), y: Math.round(a.y + (b.y - a.y) * i / n) });
+  return n ? out : [b];
+}
 const gridCols = b => Math.max(1, Math.floor((b.w - b.ox + 1) / b.cell));
 const gridRows = b => Math.max(1, Math.floor((b.h - b.oy + 1) / b.cell));
 
@@ -101,6 +107,7 @@ function battleLayerHtml(x, players = false) {
   placeTokens(b, toks);
   const pid = (players ? "pgrid-" : "grid-") + x.id;
   return `${b.asset ? assetImg(b.asset, "map-img", `draggable="false"`) : `<div class="battle-plain"></div>`}
+    ${drawingHtml(b.draw, { w: b.w, h: b.h, cell: b.cell, ox: b.ox, oy: b.oy })}
     ${b.grid ? `<svg class="map-svg battle-grid" viewBox="0 0 ${b.w} ${b.h}" width="${b.w}" height="${b.h}"><defs><pattern id="${pid}" width="${b.cell}" height="${b.cell}" x="${b.ox}" y="${b.oy}" patternUnits="userSpaceOnUse">
       <path d="M${b.cell} 0H0V${b.cell}" fill="none"/></pattern></defs><rect x="${b.ox}" y="${b.oy}" width="${gridCols(b) * b.cell}" height="${gridRows(b) * b.cell}" fill="url(#${pid})"/></svg>` : ""}
     ${fogOn(b) ? `<svg class="map-svg fog ${players ? "for-players" : ""}" viewBox="0 0 ${b.w} ${b.h}" width="${b.w}" height="${b.h}"><path id="${players ? "" : "fogPath"}" d="${fogPath(b)}"/></svg>` : ""}
@@ -112,12 +119,13 @@ function battlePanel(x) {
   const b = x.battle, combat = !!battleCombat(x);
   if (!b) return `<section class="panel battle"><div class="panel-h"><h4>Battlemap</h4></div>
     <p class="muted">Lay the fight out on a grid: upload a battlemap image, or use a plain grid. Tokens for the party and every foe are placed for you.</p>
-    <div class="btn-row"><button class="btn accent" data-act="battleImage" data-id="${x.id}">Upload battlemap…</button><button class="btn" data-act="battlePlain" data-id="${x.id}">Plain grid</button></div></section>`;
+    <div class="btn-row"><button class="btn accent" data-act="battlePlain" data-id="${x.id}" data-draw="1">✏ Draw one</button><button class="btn" data-act="battleImage" data-id="${x.id}">Upload battlemap…</button><button class="btn" data-act="battlePlain" data-id="${x.id}">Plain grid</button></div></section>`;
   if (!fogOn(b) && BATTLEV.tool === "fog") BATTLEV.tool = "move";
   const sel = BATTLEV.sel && battleTokens(x).find(t => t.key === BATTLEV.sel);
   const shown = screenIs("battle", x.id);
   return `<section class="panel battle"><div class="panel-h"><h4>Battlemap</h4><span class="muted small" id="battleInfo">${gridCols(b)} × ${gridRows(b)} squares of ${b.feet} ft</span>
       <button class="btn small ${shown ? "live" : ""}" data-act="screenBattle" data-id="${x.id}" title="Put this battlemap on the player screen">📺 ${shown ? "On the player screen" : "Show players"}</button>
+      <button class="btn small" data-act="drawOpen" data-kind="enc" data-id="${x.id}" title="Draw on this battlemap">✏ ${b.draw ? "Edit drawing" : "Draw"}</button>
       <button class="btn small" data-act="battleSetup" data-id="${x.id}">Grid…</button></div>
     <div class="battle-tools">
       <label class="check"><input type="checkbox" data-change="fogToggle" data-id="${x.id}" ${fogOn(b) ? "checked" : ""}> Fog of war</label>
@@ -186,15 +194,21 @@ function wireBattle(main, x) {
     e.preventDefault();
     const open = fogOpen(b), path = $("#fogPath", main);
     const c0 = cellAt(e.clientX, e.clientY), reveal = !open.has(c0.x + "," + c0.y);
-    const paint = ev => {
-      const c = cellAt(ev.clientX, ev.clientY);
+    let last = c0;
+    const one = c => {
       if (c.x < 0 || c.y < 0 || c.x >= gridCols(b) || c.y >= gridRows(b)) return;
       const k = c.x + "," + c.y;
       if (reveal === open.has(k)) return;
       reveal ? open.add(k) : open.delete(k);
+    };
+    const paint = ev => {
+      const c = cellAt(ev.clientX, ev.clientY);
+      cellsBetween(last, c).forEach(one);
+      last = c;
       b.fog.open = [...open];
       path?.setAttribute("d", fogPath(b));
     };
+    one(c0);
     paint(e);
     layer.setPointerCapture(e.pointerId);
     layer.addEventListener("pointermove", paint);
@@ -236,12 +250,14 @@ ACT.battleImage = async el => {
 };
 ACT.battlePlain = el => {
   const x = byId(DB.encounters, el.dataset.id);
-  modal({ title: "Plain grid", body: `<div class="row2">${textField("Squares across", "cols", 20, `type="number" min="2" max="80"`)}${textField("Squares down", "rows", 14, `type="number" min="2" max="80"`)}</div>`,
-    buttons: [{ label: "Cancel" }, { label: "Make grid", cls: "accent", act: w => {
+  const drawIt = !!el.dataset.draw;
+  modal({ title: drawIt ? "Draw a battlemap" : "Plain grid", body: `<div class="row2">${textField("Squares across", "cols", 20, `type="number" min="2" max="80"`)}${textField("Squares down", "rows", 14, `type="number" min="2" max="80"`)}</div>`,
+    buttons: [{ label: "Cancel" }, { label: drawIt ? "Start drawing" : "Make grid", cls: "accent", act: w => {
       const v = formVals(w), cols = clamp(+v.cols || 20, 2, 80), rows = clamp(+v.rows || 14, 2, 80);
       x.battle = freshBattle(x, { w: cols * PLAIN_CELL, h: rows * PLAIN_CELL });
       delete BATTLEV.view[x.id];
       commit();
+      if (drawIt) openDrawing("enc", x.id);
     } }] });
 };
 ACT.battleSetup = (el, fresh = false) => {

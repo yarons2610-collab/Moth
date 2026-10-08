@@ -470,6 +470,46 @@ body.player-mode main { overflow: hidden; }
 .ps-hint { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(40, 36, 60, .9); color: #fff; padding: 6px 14px; border-radius: 8px; font-size: 14px; z-index: 5; pointer-events: none; }
 .ps-hint[hidden] { display: none; }
 
+/* drawings and the drawing editor */
+.drawing, .drawing-slot { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.drawing.editing [data-i] { pointer-events: visiblePainted; }
+.battle-grid, .draw-preview { pointer-events: none; }
+.draw-text { font-family: var(--serif); font-weight: 600; paint-order: stroke; stroke: rgba(245, 235, 210, .8); stroke-width: 3px; }
+body[data-route="draw"] main { overflow: hidden; }
+.draw-page { display: flex; flex-direction: column; height: 100%; }
+.draw-bar, .draw-opts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+/* one row that scrolls sideways, so changing tools never resizes the canvas */
+.draw-opts { height: 52px; background: var(--bg2); flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
+.draw-opts .tex-pick, .draw-opts .stamp-pick, .draw-opts .pen-colors { flex-wrap: nowrap; }
+.draw-opts .stamp, .draw-opts .tex { flex: none; }
+.draw-title { font-family: var(--disp); white-space: nowrap; }
+.draw-bar select { padding: 4px 6px; font-size: 12.5px; }
+.draw-stage { cursor: crosshair; }
+.draw-stage.tool-pan { cursor: grab; }
+.draw-stage.tool-move { cursor: move; }
+.draw-stage.tool-erase { cursor: not-allowed; }
+.pv-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.pv-wall { fill: none; stroke: #1c1a20; opacity: .7; stroke-linecap: square; }
+.pv-dot { fill: #1c1a20; }
+.tex-pick, .pen-colors, .stamp-pick { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.tex { width: 30px; height: 30px; border-radius: 7px; border: 3px solid; color: #fff; font-weight: 700; text-shadow: 0 1px 2px #000; padding: 0; }
+.tex.on { box-shadow: 0 0 0 2px var(--ink); }
+.sw-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line2); padding: 0; }
+.sw-btn.on { box-shadow: 0 0 0 2px var(--accent); }
+.stamp { width: 38px; height: 38px; padding: 3px; border-radius: 8px; border: 1px solid var(--line2); background: #d9c69a; }
+.stamp svg, .stamp img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stamp.on { box-shadow: 0 0 0 2px var(--accent); }
+.stamp.add { background: transparent; color: var(--ink-dim); font-size: 18px; }
+.draw-opts input[type=range] { width: 110px; padding: 0; accent-color: var(--accent); }
+.move-box { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line2); border-radius: 10px; background: var(--bg2); }
+.move-box p { margin: 4px 0 8px; }
+.sync-choice { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; }
+.sync-choice .check { align-items: flex-start; margin: 4px 0; }
+.token-steps { padding-left: 20px; margin: 6px 0; }
+.token-steps li { margin: 4px 0; }
+#repoRow { margin-bottom: 8px; }
+#repoRow label { white-space: nowrap; }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }
@@ -514,3 +554,5 @@ body.player-mode main { overflow: hidden; }
   .map-thumb { width: 100%; }
   .modal-wrap { padding: 8px; }
 }
+.panel.battle .panel-h { flex-wrap: wrap; }
+@media (max-width: 760px) { .panel.battle .panel-h h4 { flex-basis: 100%; } }

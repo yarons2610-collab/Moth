@@ -7,7 +7,7 @@
    the size of the world. Pages draw images with assetImg() (or a data-asset-bg
    attribute for backgrounds), which fill in once the image has been read. */
 
-const ASSET_DB = "moth-assets";
+const ASSET_DB = "moth-assets"; // also holds drawings (as JSON), see draw.js
 const ASSET_IDS = new Set();   // every image stored on this device
 const ASSET_URLS = new Map();  // id → object URL, for images already shown
 const ASSET_LOADING = new Set();
@@ -60,7 +60,7 @@ function assetSrc(id) {
     ASSET_LOADING.add(id);
     assetData(id).then(d => {
       ASSET_LOADING.delete(id);
-      if (!d) return;
+      if (!d || !d.startsWith("data:")) return;
       const url = URL.createObjectURL(dataToBlob(d));
       ASSET_URLS.set(id, url);
       showAsset(id, url);
@@ -73,6 +73,7 @@ const assetImg = (id, cls = "", attrs = "") => `<img class="${cls}" src="${asset
 async function assetPut(data, id = "img" + uid()) {
   await assetTx("readwrite", st => st.put(data, id));
   ASSET_IDS.add(id);
+  if (!String(data).startsWith("data:")) return id; // a drawing, not a picture
   const old = ASSET_URLS.get(id);
   if (old) URL.revokeObjectURL(old);
   ASSET_URLS.set(id, URL.createObjectURL(dataToBlob(data)));
@@ -92,15 +93,17 @@ async function assetDelete(id) {
 function usedAssets(db = DB) {
   const s = new Set();
   for (const e of db.entries) { if (e.portrait) s.add(e.portrait); if (e.token) s.add(e.token); }
-  for (const m of db.maps) if (m.asset) s.add(m.asset);
-  for (const x of db.encounters) if (x.battle?.asset) s.add(x.battle.asset);
+  for (const m of db.maps) { if (m.asset) s.add(m.asset); if (m.draw) s.add(m.draw); }
+  for (const x of db.encounters) { if (x.battle?.asset) s.add(x.battle.asset); if (x.battle?.draw) s.add(x.battle.draw); }
+  for (const st of db.stamps || []) if (st.asset) s.add(st.asset);
   for (const h of db.handouts || []) if (h.asset) s.add(h.asset);
   return s;
 }
 // Images left over from deletes, once they're old enough not to be undone.
 async function pruneAssets() {
   const used = usedAssets();
-  for (const id of [...ASSET_IDS]) if (!used.has(id) && !ASSET_URLS.has(id)) await assetDelete(id).catch(() => {});
+  // drafts (unfinished drawings) are kept until they're finished or thrown away
+  for (const id of [...ASSET_IDS]) if (!used.has(id) && !ASSET_URLS.has(id) && !String(id).startsWith("draft:")) await assetDelete(id).catch(() => {});
 }
 // How much this world takes up, for Settings.
 async function assetSizes() {
@@ -108,7 +111,7 @@ async function assetSizes() {
   const used = usedAssets();
   await assetTx("readonly", st => {
     const r = st.openCursor();
-    r.onsuccess = () => { const c = r.result; if (!c) return; if (used.has(c.key)) { bytes += c.value.length * 0.75; n++; } c.continue(); };
+    r.onsuccess = () => { const c = r.result; if (!c) return; if (used.has(c.key)) { bytes += c.value.length * (c.value.startsWith("data:") ? 0.75 : 1); n++; } c.continue(); };
   });
   return { bytes, n };
 }

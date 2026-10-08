@@ -172,7 +172,7 @@ function playerMapHtml(m) {
     return `<div class="pin ${epoch(e, year)}" style="left:${p.x * m.w}px;top:${p.y * m.h}px;--c:${e ? entryColor(e) : "#e3c27a"}"><div class="pin-in"><span class="pin-dot">${e ? kindOf(e).icon : "•"}</span><span class="pin-label">${esc(e ? e.name : p.label || "")}</span></div></div>`;
   }).join("");
   const party = DB.party?.map === m.id ? `<div class="party-marker" style="left:${DB.party.x * m.w}px;top:${DB.party.y * m.h}px"><div class="pin-in"><svg viewBox="0 0 24 28" width="26" height="30"><path d="M12 1 L22 5 V13 C22 20 17 25 12 27 C7 25 2 20 2 13 V5 Z" fill="#5fc9c4" stroke="#0b0a12" stroke-width="2"/><path d="M12 6 V22 M7 11 H17" stroke="#0b0a12" stroke-width="2"/></svg></div></div>` : "";
-  return `${mapBg(m)}<svg class="map-svg" viewBox="0 0 ${m.w} ${m.h}" width="${m.w}" height="${m.h}">${regions}${MAP_OVERLAYS.map(f => f(m)).join("")}</svg>${labels}${pins}${party}`;
+  return `${mapBg(m)}${drawingHtml(m.draw, { w: m.w, h: m.h })}<svg class="map-svg" viewBox="0 0 ${m.w} ${m.h}" width="${m.w}" height="${m.h}">${regions}${MAP_OVERLAYS.map(f => f(m)).join("")}</svg>${labels}${pins}${party}`;
 }
 
 async function playerBoot() {

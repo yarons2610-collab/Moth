@@ -3,12 +3,12 @@
 // The app's own files are fetched network-first, so a new version reaches an
 // installed phone on its next launch, and the cache is the offline fallback.
 // Bump the version when the file list changes.
-const CACHE = "moth-v3";
+const CACHE = "moth-v4";
 const SHELL = [
   "./", "index.html", "manifest.json", "css/moth.css", "vendor/fonts.css",
   "vendor/fonts/jetbrains-mono-latin.woff2", "vendor/fonts/space-grotesk-latin.woff2",
   "icons/moth.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png",
-  ...["core", "assets", "codex", "family", "timeline", "story", "map", "web", "play", "battle", "screen", "music", "notes", "find", "settings", "sync", "sample", "boot"].map(m => `js/${m}.js`),
+  ...["core", "assets", "codex", "family", "timeline", "story", "map", "web", "play", "battle", "draw", "screen", "music", "notes", "find", "settings", "sync", "sample", "boot"].map(m => `js/${m}.js`),
 ];
 
 self.addEventListener("install", e => {

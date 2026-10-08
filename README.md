@@ -8,12 +8,13 @@
 - **Map**: an uploaded image or blank parchment, with pins and regions tied to the codex, nested maps and a time slider.
 - **Web** of relationships, and **family trees**.
 - **Play**: the party, sessions, quests, encounters with an initiative tracker, dice and random tables.
+- **Drawing**: draw world maps and battlemaps in the app, from scratch or over an image, with terrain brushes, floor tiles, walls, text and stamps (built in, or your own pictures). Drawings are kept as shapes, so they take kilobytes.
 - **Battlemaps** for encounters, with tokens that snap to the grid, fog of war and hidden tokens.
 - **A player screen** for the TV: a second window that shows only what you send it (a battlemap through its fog, a map without secret pins, a picture, a handout, read-aloud text). Your own window keeps everything.
 - **Music**: Spotify, YouTube, SoundCloud or Apple Music playlists linked to encounters, played from a dock that stays put while you work.
 - `[[Wiki links]]` everywhere, with backlinks on every page. Find anything with `Ctrl/⌘ K` or `/`.
 
-It's a plain static site: no build step and no server. It works offline, can be installed on a phone, and keeps your world in your browser. To use it on more than one device, it can sync through a private GitHub Gist.
+It's a plain static site: no build step and no server. It works offline, can be installed on a phone, and keeps your world in your browser. To use it on more than one device, it syncs through a private GitHub repository (or a Gist), with pictures and drawings as their own files.
 
 ## At the table
 
