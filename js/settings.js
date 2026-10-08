@@ -109,6 +109,42 @@ ACT.editCalendar = () => modal({ title: "Calendar", wide: true,
     commit();
   } }] });
 
+/* ── picking an icon ── emoji worth having in a fantasy world, each with the
+   words it can be found by */
+const EMOJI = {
+  People: "👤 person character|👥 people group|👑 royalty king queen crown|🤴 prince|👸 princess|🧙 wizard mage witch|🧝 elf|🧛 vampire|🧟 zombie undead|🧞 genie djinn|🧜 merfolk mermaid|🧚 fairy fey|🥷 assassin ninja rogue|💂 guard soldier|🧑‍🌾 farmer peasant|🧑‍⚖️ judge|🧑‍🏫 teacher scholar|🧑‍⚕️ healer doctor|🧑‍🎤 bard|🧑‍✈️ captain|🦸 hero|🦹 villain|🤺 fencer duel|🏇 rider knight|🧘 monk|🤡 jester fool|👶 child baby|🧓 elder old|👁️ eye watcher seer|🗣️ speaker voice",
+  Places: "🏰 castle|🏯 fortress keep|🏛️ temple hall classical|⛩️ shrine gate|🗼 tower|🏠 house home|🏘️ village town|🏙️ city|🏚️ ruin derelict|⛺ camp tent|🏟️ arena colosseum|🌉 bridge|🗿 statue monument|⛲ fountain|🏝️ island|🏜️ desert|🏔️ mountain peak|⛰️ mountain|🌋 volcano|🏞️ valley park|🗻 fuji mount|🕳️ hole pit cave|⚓ harbour port anchor|🚪 door|🪦 grave tomb|⚰️ coffin crypt|🛖 hut|🗺️ map region|🧭 compass travel|🌐 world globe",
+  Nature: "🌲 forest pine|🌳 tree|🌴 palm|🍄 mushroom fungus|🌿 herb plant|🌸 flower|🌹 rose|🌾 field wheat grain|🍂 autumn leaf|🌊 sea wave ocean water|💧 water drop|❄️ ice snow winter|🔥 fire flame|⚡ lightning storm|🌪️ tornado wind|☁️ cloud sky|🌈 rainbow|☀️ sun|🌙 moon night|⭐ star|🌟 bright star|☄️ comet|🌑 dark moon eclipse|🪨 rock stone|💎 gem crystal|🌱 sprout growth|🍃 wind leaf|🌫️ fog mist",
+  Creatures: "🐉 dragon|🐲 dragon head|🦄 unicorn|🐺 wolf|🦅 eagle|🦉 owl|🐦‍⬛ raven crow|🐍 snake serpent|🦇 bat|🕷️ spider|🦂 scorpion|🐙 octopus kraken|🦑 squid|🦈 shark|🐋 whale leviathan|🐻 bear|🦁 lion|🐯 tiger|🐗 boar|🐎 horse|🦌 deer stag|🐀 rat|🐈 cat|🐕 dog hound|🐸 frog|🦎 lizard|🦖 dinosaur|🐢 turtle|🦋 butterfly|🐝 bee|🪲 beetle|🦀 crab|👹 ogre oni demon|👺 goblin tengu|👻 ghost spirit|💀 skull death|☠️ skull bones pirate|👽 alien|🤖 construct golem robot|🦠 plague",
+  Things: "🗝️ key|🗡️ dagger|⚔️ swords battle|🏹 bow archer|🛡️ shield|🪓 axe|🔨 hammer smith|⛏️ pick mine|🔱 trident|🪄 wand magic|🔮 crystal ball scrying|🧿 amulet charm|📜 scroll|📖 book|📚 library books|✒️ quill writing|💍 ring|👑 crown|💰 gold money|🪙 coin|💎 jewel|🏺 urn amphora|⚱️ ashes urn|🧪 potion|⚗️ alchemy|🕯️ candle|🪔 lamp|🏮 lantern|⛓️ chains prison|🔒 lock|⚙️ machine gear|🕰️ clock time|⏳ hourglass|🎭 theatre masks|🎻 music|🥁 drum|🍷 wine|🍺 ale tavern|🍞 bread food|🧵 thread|⛵ ship sail|🛶 boat|🚂 train|🎲 dice game|🃏 card|🗿 idol",
+  Faith: "✨ divine sparkle|🕯️ candle vigil|🙏 prayer|🛐 worship|☀️ sun god|🌙 moon god|⭐ star|👁️ all-seeing eye|🔥 sacred fire|💀 death god|☯️ balance|⚖️ justice law|🕊️ peace dove|🪽 wing angel|😇 angel saint|😈 demon devil|🔱 sea god|⚡ storm god|🌾 harvest god|🌳 nature god|🗡️ war god|💘 love god|🌀 chaos|♾️ eternity|🜁 air|🜂 fire|🜃 earth|🜄 water|✝️ cross|☦️ orthodox cross|☪️ crescent|✡️ star of david|🕉️ om|☸️ wheel dharma|🛕 temple|⛪ church|🕌 mosque|🕍 synagogue",
+  Symbols: "⚑ flag|🚩 banner|🏳️ white flag|🏴 black flag|⚜️ fleur-de-lis heraldry|🔰 emblem|📍 pin place|❖ diamond|◆ shape|★ star shape|☘️ clover luck|♠️ spade|♥️ heart|♦️ diamond suit|♣️ club|⚕️ medicine|☢️ hazard|⚠️ warning danger|❓ unknown mystery|❗ important|💡 idea|💬 speech|🗒️ note|📅 calendar date|🧩 puzzle|🎯 goal target|🔑 secret answer|🧬 bloodline|🩸 blood|🫀 heart",
+};
+const emojiList = () => Object.entries(EMOJI).map(([g, s]) => [g, s.split("|").map(x => { const i = x.indexOf(" "); return [x.slice(0, i), x.slice(i + 1)]; })]);
+function emojiPicker(current) {
+  return `<div class="icon-pick">
+    <button type="button" class="icon-current" data-act="iconPickToggle" title="Pick an icon">${esc(current)}</button>
+    <input name="icon" value="${esc(current)}" class="icon-input" maxlength="16" title="Or type or paste any emoji" data-input="iconTyped">
+    <div class="emoji-pick" hidden>
+      <input type="search" class="emoji-search" placeholder="Search: dragon, temple, skull…" data-input="emojiSearch">
+      <div class="emoji-groups">${emojiList().map(([g, list]) => `<div class="emoji-group"><h5>${g}</h5><div class="emoji-grid">${list.map(([e, words]) =>
+        `<button type="button" class="emoji" data-act="emojiPick" data-e="${e}" data-words="${esc(words)}" title="${esc(words)}">${e}</button>`).join("")}</div></div>`).join("")}</div>
+    </div></div>`;
+}
+ACT.iconPickToggle = el => { const p = el.parentElement.querySelector(".emoji-pick"); p.hidden = !p.hidden; if (!p.hidden) p.querySelector(".emoji-search").focus(); };
+ACT.emojiPick = el => {
+  const box = el.closest(".icon-pick");
+  $(".icon-input", box).value = el.dataset.e;
+  $(".icon-current", box).textContent = el.dataset.e;
+  $(".emoji-pick", box).hidden = true;
+};
+ACT.iconTyped = el => { el.parentElement.querySelector(".icon-current").textContent = el.value || "◆"; };
+ACT.emojiSearch = el => {
+  const q = norm(el.value), box = el.closest(".emoji-pick");
+  for (const b of $$(".emoji", box)) b.hidden = !!q && !b.dataset.words.includes(q);
+  for (const g of $$(".emoji-group", box)) g.hidden = !$$(".emoji", g).some(b => !b.hidden);
+};
+
 // one row of the field editor
 function kfRow(f) {
   return `<div class="kf-row" data-id="${f.id || ""}">
@@ -137,7 +173,7 @@ ACT.editKind = el => {
   const used = DB.entries.filter(e => e.kind === k.id).length;
   const secs = [...new Set(DB.kinds.flatMap(x => x.fields.map(f => f.sec)).filter(Boolean))];
   modal({ title: isNew ? "New kind of entry" : "Edit " + k.name, wide: true,
-    body: `<div class="row3">${textField("Name", "name", k.name, "autofocus")}${textField("Icon (an emoji)", "icon", k.icon)}${field("Colour", `<input type="color" name="color" value="${k.color}">`)}</div>
+    body: `<div class="row3">${textField("Name", "name", k.name, "autofocus")}${field("Icon", emojiPicker(k.icon))}${field("Colour", `<input type="color" name="color" value="${k.color}">`)}</div>
       <div class="row2">${textField("Start date is called", "startLabel", k.startLabel)}${textField("End date is called", "endLabel", k.endLabel)}</div>
       <h4 class="screen-h">Fields</h4>
       <p class="muted small">Fields with the same section are shown together; ones with no section sit beside the article. 🙈 marks a secret: only you see it, and it never goes on the player screen. Empty fields don't show on an entry's page.</p>

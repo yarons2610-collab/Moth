@@ -2,7 +2,7 @@
 
 *Moth, a play on myth.* A worldbuilding and fiction notebook that can also run your world at the table.
 
-- **Codex**: characters, places, factions, items, lore and creatures, or any kind you define. Each kind has a full template of fields in sections (appearance, personality, background, secrets…) that you can change, with secret fields only you see; entries can add fields of their own, and have relationships, portraits and optional game stats.
+- **Codex**: characters, places, factions, items, lore, religions, deities and creatures, or any kind you define. Each kind has a full template of fields in sections (appearance, personality, background, secrets…) that you can change, with secret fields only you see; entries can add fields of their own, and have relationships, portraits and optional game stats.
 - **Timeline** in the world's own calendar (eras and months), with characters' ages at every event.
 - **Story**: books, chapters and scenes, and a writing view that saves as you type.
 - **Map**: an uploaded image or blank parchment, with pins and regions tied to the codex, nested maps and a time slider.

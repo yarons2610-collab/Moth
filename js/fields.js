@@ -56,6 +56,27 @@ const KIND_TEMPLATES = {
     ["The telling", "What people say", "long"], ["The telling", "Sources", "list"],
     ["The truth", "Is it true?", "choice!", "True|Partly true|False|Unknown"], ["The truth", "What really happened", "long!"],
   ],
+  religion: [
+    ["", "Type", "choice", "Pantheon|One god|Dualist|Ancestor worship|Animist|Philosophy|Mystery cult|Cult|Other"], ["", "Deities", "links"], ["", "Founder", "link"],
+    ["", "Head of the faith", "link"], ["", "Holy city", "link"], ["", "Symbol", "text"], ["", "Holy text", "text"], ["", "Followers", "text"],
+    ["", "Standing", "choice", "Dominant|Widespread|Minority|Persecuted|Secret|Dying|Extinct"],
+    ["Beliefs", "Core beliefs", "long"], ["Beliefs", "Creation", "long"], ["Beliefs", "Afterlife", "long"], ["Beliefs", "Virtues", "list"], ["Beliefs", "Sins", "list"], ["Beliefs", "Taboos", "list"],
+    ["Practice", "Rites and rituals", "long"], ["Practice", "Prayers and greetings", "text"], ["Practice", "Holy days", "list"], ["Practice", "Pilgrimages", "text"],
+    ["Practice", "Offerings", "list"], ["Practice", "Clergy", "long"], ["Practice", "Ranks", "list"], ["Practice", "Dress and signs", "text"], ["Practice", "Temples", "links"],
+    ["In the world", "Where it's followed", "links"], ["In the world", "Sects and heresies", "long"], ["In the world", "Allies", "links"], ["In the world", "Enemies", "links"], ["In the world", "Church and state", "long"],
+    ["Secrets", "What the faithful don't know", "long!"], ["Secrets", "Secrets", "long!"],
+  ],
+  deity: [
+    ["", "Titles", "list"], ["", "Domains", "list"], ["", "Rank", "choice", "Supreme|Greater|Lesser|Demigod|Saint|Spirit|Ascended mortal"],
+    ["", "Nature", "choice", "Kind|Stern|Neutral|Capricious|Cruel|Unknowable"], ["", "Status", "choice", "Worshipped|Forgotten|Sleeping|Imprisoned|Dead|Unknown"],
+    ["", "Religion", "link"], ["", "Realm", "link"], ["", "Symbol", "text"], ["", "Sacred animal", "text"], ["", "Sacred colours", "text"],
+    ["Appearance", "Forms", "long"], ["Appearance", "Signs and omens", "long"],
+    ["Character", "Personality", "long"], ["Character", "Desires", "long"], ["Character", "Teachings", "long"], ["Character", "Taboos", "list"],
+    ["Worship", "Worshippers", "text"], ["Worship", "Clergy", "text"], ["Worship", "Rites", "long"], ["Worship", "Offerings", "list"], ["Worship", "Holy days", "list"], ["Worship", "Temples", "links"],
+    ["Relations", "Allies", "links"], ["Relations", "Rivals", "links"], ["Relations", "Servants and avatars", "links"], ["Relations", "Chosen mortals", "links"],
+    ["Myths", "Origin", "long"], ["Myths", "Great deeds", "long"], ["Myths", "Myths", "long"],
+    ["Secrets", "True nature", "long!"], ["Secrets", "Secrets", "long!"],
+  ],
   creature: [
     ["", "Type", "text"], ["", "Habitat", "text"], ["", "Size", "choice", "Tiny|Small|Medium|Large|Huge|Gargantuan"],
     ["", "Danger", "choice", "Harmless|Low|Moderate|High|Deadly"], ["", "Lifespan", "text"], ["", "Diet", "text"],
@@ -78,10 +99,14 @@ function addSuggestedFields(k) {
 }
 // worlds made before templates existed get them once
 function upgradeKinds(db) {
-  if ((db.fieldsV || 0) >= 1) return;
-  for (const k of db.kinds) addSuggestedFields(k);
-  db.fieldsV = 1;
+  const v = db.fieldsV || 0;
+  if (v < 1) for (const k of db.kinds) addSuggestedFields(k);
+  // version 2 brought Religion and Deity; a world that already has kinds by
+  // those names keeps its own
+  if (v < 2) for (const k of NEW_KINDS_V2()) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
+  db.fieldsV = 2;
 }
+const NEW_KINDS_V2 = () => defaultKinds().filter(k => k.id === "religion" || k.id === "deity");
 
 // sections in order: the untitled one ("Basics") first, then as they come
 function fieldSections(fields) {

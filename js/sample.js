@@ -63,6 +63,10 @@ function sampleWorld() {
   E.guild.fields[fid("faction", "Leader")] = E.isel.id; E.guild.fields[fid("faction", "Seat")] = E.saltmere.id;
   E.lumen.fields[fid("place", "Ruler")] = E.aldra.id;
   E.drowned.fields[fid("creature", "Habitat")] = "Tidal flats, wrecks, the Weir at low tide";
+  add("saint", "deity", "The Lighthouse Saint", { summary: "Patron of sailors, lamp-keepers and the lost. Once a woman; now a light.", aliases: ["Saint Gull"], color: "#f6d97a",
+    body: "Before the [[The Flood|Flood]] she kept a lamp on the cliffs above [[Old Lumen]]. When the sea came she kept it lit all night, and every ship that saw it reached the hills. In the morning she was gone, and the lamp was still burning." });
+  add("faith", "religion", "The Lamplit Faith", { summary: "Saltmere's faith: keep a light for those still at sea.", start: { y: AF(12) }, color: "#e8b04a" });
+  add("tidecult", "religion", "The Drowned Saints", { summary: "The Tidebound's creed: the sea took the Old Kingdom to keep it safe, and will give it back to the faithful.", color: "#4a8fc0" });
   const fill = (key, kind, o) => { for (const [name, v] of Object.entries(o)) E[key].fields[fid(kind, name)] = v; };
   fill("maren", "character", {
     Pronouns: "she/her", Species: "Human", Occupation: "Smuggler", Status: "Alive", Birthplace: E.weir.id,
@@ -91,6 +95,16 @@ function sampleWorld() {
   });
   fill("guild", "faction", { Type: "Guild", Size: "About 300 members", Symbol: "A hook and a scale", Motto: "What the sea takes, we recover.", Goals: "Keep Saltmere solvent, and in debt to the Guild.", Ranks: "Collector\nFactor\nMaster\nGuildmistress", "Notable members": [E.isel.id], Enemies: [E.tidebound.id], "Hidden agenda": "Half the masters want the Old Kingdom's treasury, not its return." });
   fill("crown", "item", { Type: "Relic", Rarity: "Unique", Material: "Sea-pearl and pale gold", Appearance: "A plain circlet, cold to the touch even in summer.", Properties: "The wearer can breathe underwater, and hears voices in the tide.", "True nature": "It doesn't remember the wearer. It remembers the Old Kingdom, and wants it back." });
+  fill("saint", "deity", { Titles: "The Lighthouse Saint\nSaint Gull\nShe Who Kept the Lamp", Domains: "Light\nSea travel\nThe lost\nVigils", Rank: "Saint", Nature: "Kind", Status: "Worshipped",
+    Religion: E.faith.id, Realm: E.gullwatch.id, Symbol: "A lamp with a gull's wing for a flame", "Sacred animal": "The herring gull", "Sacred colours": "White and gold",
+    "Signs and omens": "A lamp that won't go out. Gulls circling a ship that's off course.", Teachings: "Keep a light for those still at sea. Nobody is lost while someone is looking.", Taboos: "Putting out a light at sea\nWhistling on the water",
+    Rites: "A candle in every window on the night of the Flood.", Offerings: "Lamp oil\nBread for the gulls", "Chosen mortals": [E.ansel.id],
+    "True nature": "She didn't keep the lamp lit. Queen [[Aldra]] did, from the palace, as it went down." });
+  fill("faith", "religion", { Type: "One god", Deities: [E.saint.id], "Holy city": E.saltmere.id, Symbol: "A lit lamp", Followers: "Most of Saltmere", Standing: "Dominant",
+    "Core beliefs": "The sea gives back what it takes, if someone keeps a light for it.", Afterlife: "The drowned sail on toward the last lamp.", Virtues: "Vigilance\nHospitality\nKeeping your word", Sins: "Wrecking\nLeaving a light unlit",
+    "Holy days": "The Night of Lamps (the Flood's anniversary)", Temples: [E.gullwatch.id], "Where it's followed": [E.saltmere.id, E.weir.id], Enemies: [E.tidecult.id] });
+  fill("tidecult", "religion", { Type: "Mystery cult", Standing: "Secret", "Core beliefs": "The Old Kingdom isn't dead; it's waiting.", Enemies: [E.faith.id], Secrets: "Its head is a Guild master." });
+  rel("tidebound", "tidecult", "follows", "");
   fill("drowned", "creature", { Type: "Undead", Size: "Medium", Danger: "Moderate", Appearance: "Swollen, pale, wearing whatever they drowned in.", Behaviour: "They walk inland at low tide, looking for home, and drag the living back with them.", Weaknesses: "Fire\nFresh water", Secrets: "They are all walking toward the Sunken Palace." });
 
   const ev = (title, date, involves, body = "", p = {}) => db.events.push({ id: uid(), title, date, end: null, involves: involves.map(k => E[k].id), body, tags: [], color: "", ...p });

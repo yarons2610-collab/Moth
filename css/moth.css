@@ -545,6 +545,20 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .ps-details span { color: #a69e8a; }
 .ps-details b { font-weight: 400; }
 
+/* picking an icon */
+.icon-pick { position: relative; display: flex; gap: 6px; align-items: center; }
+.icon-current { width: 40px; height: 36px; flex: none; font-size: 20px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg2); padding: 0; }
+.icon-current:hover { border-color: var(--accent); }
+.icon-input { width: 70px; flex: none; font-size: 16px; text-align: center; }
+.emoji-pick { position: absolute; z-index: 5; top: 42px; left: 0; width: min(360px, 82vw); max-height: 340px; overflow: auto; background: var(--panel2); border: 1px solid var(--line2); border-radius: 12px; padding: 8px; box-shadow: 0 12px 30px rgba(0, 0, 0, .5); }
+.emoji-pick[hidden] { display: none; }
+.emoji-search { margin-bottom: 6px; }
+.emoji-group h5 { margin: 6px 0 3px; font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .06em; }
+.emoji-group[hidden], .emoji[hidden] { display: none; }
+.emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, 36px); gap: 2px; }
+.emoji { width: 36px; height: 36px; font-size: 20px; border: 0; border-radius: 7px; background: transparent; padding: 0; }
+.emoji:hover { background: var(--line); }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }
