@@ -232,24 +232,7 @@ ACT.syncNow = async () => { await pull(); if (ls.get("dirty")) await push(); rer
 ACT.syncOff = async () => { if (await ask("Stop syncing on this device?", "The world stays here and on GitHub; they just stop talking.", "Stop syncing", "")) { disconnectSync(); rerender(); } };
 
 ACT.exportWorld = async () => download(`${fileSlug(DB.world.name)}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await exportBundle()));
-ACT.importWorld = () => {
-  const inp = document.createElement("input");
-  inp.type = "file"; inp.accept = ".json,application/json";
-  inp.onchange = async () => {
-    const f = inp.files[0];
-    if (!f) return;
-    let data;
-    try { data = JSON.parse(await f.text()); } catch { return toast("That file isn't a Moth export"); }
-    const db = data.db || (data.entries ? data : null);
-    if (!db) return toast("That file isn't a Moth export");
-    if (!await ask("Replace this world?", `“${esc(db.world?.name || "Untitled")}” replaces “${esc(DB.world.name)}” on this device${syncOn() ? " and in the Gist" : ""}. Export first if you want to keep it.`, "Replace", "danger")) return;
-    for (const [id, d] of Object.entries(data.assets || {})) await assetPut(d, id);
-    DB = normalizeDB(db);
-    commit();
-    toast("Imported " + DB.world.name);
-  };
-  inp.click();
-};
+// importing lives in merge.js
 ACT.loadSample = async () => {
   if (DB.entries.length && !await ask("Load the sample world?", `“The Drowned Crown” replaces “${esc(DB.world.name)}” on this device. Export first if you want to keep it.`, "Load it", "danger")) return;
   DB = sampleWorld();

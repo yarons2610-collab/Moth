@@ -627,6 +627,9 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .ver-pic { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
 @media (max-width: 760px) { .ver-table td:first-child, .ver-table th:first-child { width: 70px; } }
 
+.import-sum { padding-left: 18px; }
+.import-sum li { margin: 6px 0; }
+
 /* find */
 .modal.find { align-self: start; margin-top: 8vh; }
 .find-res { margin-top: 8px; max-height: 60vh; overflow: auto; }

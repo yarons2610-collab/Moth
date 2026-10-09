@@ -12,7 +12,7 @@ const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ESC[c]);
 const unesc = s => String(s).replace(/&(amp|lt|gt|quot|#39);/g, (m, k) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" })[k]);
 const byId = (arr, id) => arr.find(x => x.id === id) || null;
-const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
+const plural = (n, w) => n + " " + (n === 1 ? w : /[^aeiou]y$/i.test(w) ? w.slice(0, -1) + "ies" : w + "s");
 const countWords = s => (String(s || "").match(/\S+/g) || []).length;
 const norm = s => String(s || "").trim().toLowerCase();
 const splitList = s => String(s || "").split(",").map(x => x.trim()).filter(Boolean);
