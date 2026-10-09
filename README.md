@@ -2,13 +2,13 @@
 
 *Moth, a play on myth.* A worldbuilding and fiction notebook that can also run your world at the table.
 
-- **Codex**: characters, places, factions, items, lore, religions, deities, magic systems, spells, languages, cultures and creatures, or any kind you define. Each kind has a full template of fields in sections (appearance, personality, background, secrets…) that you can change, with secret fields only you see; entries can add fields of their own, and have relationships, portraits and optional game stats.
+- **Codex**: characters, places, factions, items, lore, religions, deities, magic systems, spells, languages, cultures and creatures, or any kind you define. Each kind has a full template of fields in sections (appearance, personality, background, secrets…) that you can change, with secret fields only you see; entries can add fields of their own, and have relationships, portraits and optional game stats. The codex can be ordered (by name, age, first appearance in the story, connections, or any choice field such as Role) and grouped by kind, tag, or any choice, yes/no or link field.
 - **Timeline** in the world's own calendar (eras and months), with characters' ages at every event.
 - **Story**: books, chapters and scenes, and a writing view that saves as you type.
-- **Map**: an uploaded image or blank parchment, with pins and regions tied to the codex, nested maps and a time slider.
-- **Web** of relationships, and **family trees**.
+- **Map**: an uploaded image or blank parchment, with pins and regions tied to the codex, nested maps and a time slider. Regions can mark realms or zones of climate, landscape and magic, each with its own fill, border and label, drawn by corners or freehand; layers can be hidden and a legend explains the zones.
+- **Web** of relationships, and **family trees** drawn as genealogy charts: generations in rows, couples joined, children hanging from their parents.
 - **Play**: the party, sessions, quests, encounters with an initiative tracker, dice and random tables.
-- **Drawing**: draw world maps and battlemaps in the app, from scratch or over an image, with terrain brushes, floor tiles, walls, text and stamps (built in, or your own pictures). Drawings are kept as shapes, so they take kilobytes.
+- **Drawing**: draw world maps and battlemaps in the app, from scratch or over an image, with terrain brushes and fills (biomes, rock, water and fantastic ground), feature lines (rivers, coasts, cliffs, mountain ridges, canyons, roads, borders, ley lines), a scatter brush for forests and ranges, floor tiles, walls, text and stamps (landforms, places and fantastic sites built in, or your own pictures). Drawings are kept as shapes, so they take kilobytes.
 - **Battlemaps** for encounters, with tokens that snap to the grid, fog of war and hidden tokens.
 - **A player screen** for the TV: a second window that shows only what you send it (a battlemap through its fog, a map without secret pins, a picture, a handout, read-aloud text). Your own window keeps everything.
 - **Music**: Spotify, YouTube, SoundCloud or Apple Music playlists linked to encounters, played from a dock that stays put while you work.

@@ -153,7 +153,7 @@ function renderPlayer() {
     fit = b;
   } else if (s.kind === "map" && byId(DB.maps, s.id)) {
     const m = byId(DB.maps, s.id);
-    html = `<div class="ps-stage"><div class="map-layer" id="psLayer" style="width:${m.w}px;height:${m.h}px">${playerMapHtml(m)}</div></div><div class="ps-caption">${esc(m.name)}</div>`;
+    html = `<div class="ps-stage"><div class="map-layer" id="psLayer" style="width:${m.w}px;height:${m.h}px">${playerMapHtml(m)}</div>${mapLegend(m, m.regions.filter(r => !r.secret && regionShown(m, r)))}</div><div class="ps-caption">${esc(m.name)}</div>`;
     fit = m;
   } else if (s.kind === "entry" && byId(DB.entries, s.id)) {
     const e = byId(DB.entries, s.id), pic = e.portrait || e.token;
@@ -189,8 +189,9 @@ function playerInitiative(x) {
 // a map as the players see it: no secret pins or regions, nothing from the future
 function playerMapHtml(m) {
   const year = NOW().y, vis = r => !r.secret && epoch(byId(DB.entries, r.entry), year) !== "future";
-  const regions = m.regions.filter(vis).map(r => { const e = byId(DB.entries, r.entry); return `<polygon class="region ${epoch(e, year)}" points="${r.pts.map(p => p[0] * m.w + "," + p[1] * m.h).join(" ")}" style="--c:${r.color || (e ? entryColor(e) : "#e3c27a")}"/>`; }).join("");
-  const labels = m.regions.filter(vis).map(r => { const e = byId(DB.entries, r.entry), c = regionCenter(r); return `<div class="region-label ${epoch(e, year)}" style="left:${c.x * m.w}px;top:${c.y * m.h}px"><span>${esc(e ? e.name : r.label || "")}</span></div>`; }).join("");
+  const shown = m.regions.filter(r => vis(r) && regionShown(m, r)).sort((a, b) => (a.layer && a.layer !== "realm" ? 0 : 1) - (b.layer && b.layer !== "realm" ? 0 : 1));
+  const regions = shown.map(r => regionSvg(m, r, epoch(byId(DB.entries, r.entry), year))).join("");
+  const labels = shown.map(r => regionLabel(m, r, epoch(byId(DB.entries, r.entry), year))).join("");
   const pins = m.pins.filter(vis).map(p => {
     const e = byId(DB.entries, p.entry);
     return `<div class="pin ${epoch(e, year)}" style="left:${p.x * m.w}px;top:${p.y * m.h}px;--c:${e ? entryColor(e) : "#e3c27a"}"><div class="pin-in"><span class="pin-dot">${e ? kindOf(e).icon : "•"}</span><span class="pin-label">${esc(e ? e.name : p.label || "")}</span></div></div>`;

@@ -41,6 +41,122 @@ function mapBg(m) {
   return m.asset ? assetImg(m.asset, "map-img", `draggable="false"`) : `<div class="parchment"></div>`;
 }
 
+/* ── region styles ── a region marks a realm or place, or a zone on one of the
+   other layers: climate, landscape or magic. Each zone kind has its own colour
+   and fill (hatching, dots, waves, little peaks, sparkles…), any of which can
+   be changed per region, along with the border, how strong the fill is, the
+   label's size and whether the edges are smoothed. A map can hide layers
+   (m.hide), and a legend lists the zones shown. */
+const REGION_LAYERS = { realm: ["Realms & places", "🏰"], climate: ["Climate", "🌦"], land: ["Landscape", "⛰"], magic: ["Magic", "✨"] };
+const ZONES = {
+  climate: {
+    polar: ["Polar / ice cap", "#cfe0ef", "dots"], tundra: ["Tundra", "#a9bab2", "dots"], subarctic: ["Subarctic / taiga", "#6f9a80", "trees"],
+    temperate: ["Temperate", "#86b866", "tint"], oceanic: ["Oceanic / rainy", "#5fa89a", "rain"], continental: ["Continental", "#a8b060", "hatch"],
+    mediterranean: ["Mediterranean", "#d6ae58", "hatch"], steppe: ["Steppe / semi-arid", "#d4bc72", "dots"], desert: ["Desert / arid", "#e6bf72", "waves"],
+    savanna: ["Savanna", "#c8a848", "hatch"], tropical: ["Tropical rainforest", "#2f9452", "trees"], monsoon: ["Monsoon", "#3f9a86", "rain"],
+    highland: ["Highland / alpine", "#a49ebc", "peaks"], storm: ["Stormy", "#6f7fa8", "rain"],
+  },
+  land: {
+    mountains: ["Mountains", "#8f806a", "peaks"], highlands: ["Highlands", "#a8966a", "hills"], hills: ["Hills", "#a2ac6a", "hills"],
+    plateau: ["Plateau", "#b49a72", "cross"], plains: ["Plains / lowlands", "#a6c07e", "tint"], valley: ["Valley / basin", "#78ac74", "tint"],
+    forest: ["Forest", "#3d7a48", "trees"], wetlands: ["Wetlands / marsh", "#5f8c78", "reeds"], volcanic: ["Volcanic", "#9a4632", "blots"],
+    karst: ["Karst / caves", "#8f9096", "dots"], badlands: ["Badlands / canyons", "#bc7448", "hatch"], dunes: ["Dunes", "#e0bc76", "waves"],
+    glacier: ["Glacier", "#c6dff0", "cross"], coast: ["Coast / shelf", "#6eb0d2", "waves"], depths: ["Ocean depths", "#2f5f8f", "waves"],
+  },
+  magic: {
+    wild: ["Wild magic", "#c058d6", "stars"], dead: ["Dead magic", "#6a6a7a", "cross"], ley: ["Ley convergence", "#4ed2ca", "rings"],
+    fey: ["Fey realm", "#e486c4", "stars"], blight: ["Blight / corruption", "#6a8a2a", "blots"], holy: ["Holy ground", "#e8cc62", "rays"],
+    shadow: ["Shadowlands", "#4a3a72", "hatch"], fire: ["Elemental fire", "#e4602a", "rays"], frost: ["Elemental frost", "#7ec8ec", "dots"],
+    dream: ["Dreaming / unreal", "#a294e6", "rings"], sky: ["Sky realm", "#a8d2f2", "rings"], warded: ["Warded / sealed", "#d8b048", "cross"],
+  },
+};
+const REGION_FILLS = { tint: "Plain tint", hatch: "Hatching", cross: "Cross-hatching", dots: "Dots", waves: "Waves", rain: "Rain", hills: "Hills", peaks: "Peaks",
+  trees: "Trees", reeds: "Reeds", stars: "Sparkles", rings: "Rings", rays: "Rays", blots: "Blots", none: "No fill (outline only)" };
+const REGION_BORDERS = { solid: "Solid", dashed: "Dashed", dotted: "Dotted", double: "Double", thick: "Thick ink", glow: "Glow", none: "None" };
+const LAYER_BORDER = { realm: "solid", climate: "dashed", land: "none", magic: "glow" };
+function regionLook(r, e) {
+  const layer = REGION_LAYERS[r.layer] ? r.layer : "realm", z = ZONES[layer]?.[r.zone];
+  return {
+    layer, z,
+    color: r.color || (z ? z[1] : e ? entryColor(e) : "#e3c27a"),
+    fill: REGION_FILLS[r.fill] ? r.fill : z ? z[2] : "tint",
+    border: REGION_BORDERS[r.border] ? r.border : LAYER_BORDER[layer],
+    op: r.op ?? (layer === "realm" ? 0.22 : 0.32),
+  };
+}
+// a pattern tile for a fill, in map pixels (u: the map's scale)
+function fillTile(fill, c, u) {
+  const T = 22 * u, w = 1.6 * u, st = `stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round"`;
+  const tile = {
+    hatch: `<path d="M0 ${T}L${T} 0M${-T / 2} ${T / 2}L${T / 2} ${-T / 2}M${T / 2} ${T * 1.5}L${T * 1.5} ${T / 2}" ${st}/>`,
+    cross: `<path d="M0 ${T}L${T} 0M0 0L${T} ${T}" ${st}/>`,
+    dots: `<circle cx="${T / 4}" cy="${T / 4}" r="${1.7 * u}" fill="${c}"/><circle cx="${T * .75}" cy="${T * .75}" r="${1.7 * u}" fill="${c}"/>`,
+    waves: `<path d="M0 ${T * .35}q${T / 4} ${-T / 5} ${T / 2} 0t${T / 2} 0M0 ${T * .85}q${T / 4} ${-T / 5} ${T / 2} 0t${T / 2} 0" ${st}/>`,
+    rain: `<path d="M${T * .2} ${T * .1}l${-T * .1} ${T * .3}M${T * .7} ${T * .55}l${-T * .1} ${T * .3}" ${st}/>`,
+    hills: `<path d="M${T * .05} ${T * .45}q${T * .2} ${-T * .32} ${T * .4} 0M${T * .5} ${T * .95}q${T * .2} ${-T * .32} ${T * .4} 0" ${st}/>`,
+    peaks: `<path d="M${T * .05} ${T * .45}l${T * .2} ${-T * .35} ${T * .2} ${T * .35}M${T * .5} ${T * .95}l${T * .2} ${-T * .35} ${T * .2} ${T * .35}" ${st}/>`,
+    trees: `<circle cx="${T * .25}" cy="${T * .25}" r="${T * .13}" fill="${c}"/><path d="M${T * .25} ${T * .38}v${T * .1}" ${st}/><circle cx="${T * .75}" cy="${T * .72}" r="${T * .13}" fill="${c}"/><path d="M${T * .75} ${T * .85}v${T * .1}" ${st}/>`,
+    reeds: `<path d="M${T * .2} ${T * .45}v${-T * .25}M${T * .28} ${T * .45}v${-T * .32}M${T * .36} ${T * .45}v${-T * .2}M${T * .62} ${T * .95}v${-T * .25}M${T * .7} ${T * .95}v${-T * .32}M${T * .78} ${T * .95}v${-T * .2}" ${st}/>`,
+    stars: `<path d="M${T * .25} ${T * .08}l${T * .04} ${T * .13} ${T * .13} ${T * .04} ${-T * .13} ${T * .04} ${-T * .04} ${T * .13} ${-T * .04} ${-T * .13} ${-T * .13} ${-T * .04} ${T * .13} ${-T * .04}z" fill="${c}"/><circle cx="${T * .72}" cy="${T * .72}" r="${1.4 * u}" fill="${c}"/>`,
+    rings: `<circle cx="${T / 2}" cy="${T / 2}" r="${T * .28}" ${st}/>`,
+    rays: `<path d="M${T / 2} ${T * .2}v${T * .6}M${T * .2} ${T / 2}h${T * .6}M${T * .29} ${T * .29}l${T * .42} ${T * .42}M${T * .71} ${T * .29}l${-T * .42} ${T * .42}" ${st} stroke-width="${w * .8}"/>`,
+    blots: `<path d="M${T * .1} ${T * .3}c${T * .1} ${-T * .2} ${T * .35} ${-T * .1} ${T * .3} ${T * .1}s${-T * .3} ${T * .15} ${-T * .3} ${-T * .1}z" fill="${c}"/><circle cx="${T * .72}" cy="${T * .75}" r="${T * .09}" fill="${c}"/>`,
+  }[fill];
+  return tile ? { T, tile } : null;
+}
+// closed and smoothed (Catmull-Rom), or straight from corner to corner
+function regionPath(pts, smooth) {
+  const n = pts.length, f = v => Math.round(v * 10) / 10;
+  if (!smooth || n < 3) return "M" + pts.map(p => f(p[0]) + " " + f(p[1])).join("L") + "Z";
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    d += `C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
+  }
+  return d + "Z";
+}
+const regionShown = (m, r) => !(m.hide || []).includes(REGION_LAYERS[r.layer] ? r.layer : "realm");
+// the region as SVG: soft fill, its pattern, then the border
+function regionSvg(m, r, cls = "") {
+  const e = byId(DB.entries, r.entry), L = regionLook(r, e), u = m.w / 1600;
+  const d = regionPath(r.pts.map(p => [p[0] * m.w, p[1] * m.h]), r.smooth);
+  const pid = "rf-" + r.id, t = L.fill !== "tint" && L.fill !== "none" && fillTile(L.fill, L.color, u);
+  const edge = (w, more = "") => `<path class="r-edge" d="${d}" fill="none" stroke="${L.color}" stroke-width="${w}" ${more}/>`;
+  const border = {
+    solid: edge(2), dashed: edge(2.2, `stroke-dasharray="9 6"`), dotted: edge(3, `stroke-dasharray="0.5 6" stroke-linecap="round"`),
+    double: edge(6) + `<path d="${d}" fill="none" stroke="#f4ecd8" stroke-width="2" opacity=".9"/>`,
+    thick: `<path class="r-edge" d="${d}" fill="none" stroke="color-mix(in srgb, ${L.color} 55%, #1a1410)" stroke-width="4.5"/>`,
+    glow: edge(12, `opacity=".22"`) + edge(5, `opacity=".3"`) + edge(1.8), none: "",
+  }[L.border];
+  return `<g class="region ${cls} layer-${L.layer} border-${L.border}" data-region="${r.id}">
+    ${t ? `<defs><pattern id="${pid}" width="${t.T}" height="${t.T}" patternUnits="userSpaceOnUse">${t.tile}</pattern></defs>` : ""}
+    <path class="r-fill" d="${d}" fill="${L.fill === "none" ? "transparent" : L.color}" fill-opacity="${L.fill === "none" ? 0 : t ? L.op * 0.55 : L.op}"/>
+    ${t ? `<path d="${d}" fill="url(#${pid})" opacity="${Math.min(1, 0.35 + L.op * 1.6)}" pointer-events="none"/>` : ""}${border}</g>`;
+}
+function regionLabel(m, r, cls = "") {
+  const e = byId(DB.entries, r.entry), text = e ? e.name : r.label || "";
+  if (!text) return "";
+  const c = regionCenter(r), L = regionLook(r, e);
+  return `<div class="region-label ${cls} layer-${L.layer} size-${r.labelSize || "m"}" style="left:${c.x * m.w}px;top:${c.y * m.h}px;--c:${L.color}"><span>${esc(text)}</span></div>`;
+}
+// what the zones shown on this map mean
+function mapLegend(m, regions) {
+  const seen = new Map();
+  for (const r of regions) {
+    const L = regionLook(r, byId(DB.entries, r.entry));
+    if (!L.z) continue;
+    const k = L.layer + ":" + r.zone + ":" + L.color + ":" + L.fill;
+    if (!seen.has(k)) seen.set(k, { L, r });
+  }
+  if (!seen.size) return "";
+  const byLayer = Object.keys(REGION_LAYERS).map(l => [l, [...seen.values()].filter(x => x.L.layer === l)]).filter(([, xs]) => xs.length);
+  return `<div class="map-legend">${byLayer.map(([l, xs]) => `<b>${REGION_LAYERS[l][1]} ${REGION_LAYERS[l][0]}</b>${xs.map(({ L, r }) => {
+    const t = L.fill !== "tint" && L.fill !== "none" && fillTile(L.fill, L.color, 0.7);
+    return `<span class="lg-row"><svg width="22" height="16" viewBox="0 0 22 16">${t ? `<defs><pattern id="lg-${r.id}" width="${t.T}" height="${t.T}" patternUnits="userSpaceOnUse">${t.tile}</pattern></defs>` : ""}
+      <rect x="1" y="1" width="20" height="14" rx="3" fill="${L.color}" fill-opacity="${t ? .3 : .55}" stroke="${L.color}"/>${t ? `<rect x="1" y="1" width="20" height="14" rx="3" fill="url(#lg-${r.id})"/>` : ""}</svg>${esc(L.z[0])}</span>`;
+  }).join("")}`).join("")}</div>`;
+}
+
 /* a cropped thumbnail of where an entry sits, for its codex page */
 ENTITY_PANELS.push(e => {
   const spots = pinsFor(e.id);
@@ -65,11 +181,10 @@ addRoute("map", "map", (id, focusPin) => {
   const minY = Math.min(...years), maxY = Math.max(...years, NOW().y);
   const trail = mapTrail(m);
   const tools = [["pan", "✋", "Move", "Move around and tap things"], ["pin", "📍", "Pin", "Drop a pin"], ["region", "⬠", "Region", "Draw a region"], ["party", "🛡", "Party", "Move the party"]];
-  const regions = m.regions.map(r => {
-    const e = byId(DB.entries, r.entry), ep = epoch(e, year);
-    if (ep === "future") return "";
-    return `<polygon class="region ${ep} ${r.secret ? "secret" : ""} ${MAPV.sel?.region === r.id ? "sel" : ""}" data-region="${r.id}" points="${r.pts.map(p => p[0] * m.w + "," + p[1] * m.h).join(" ")}" style="--c:${r.color || (e ? entryColor(e) : "#e3c27a")}"/>`;
-  }).join("");
+  // realms on top of the zones beneath them, so the ones you tap most are easiest to reach
+  const shownRegions = m.regions.filter(r => regionShown(m, r) && epoch(byId(DB.entries, r.entry), year) !== "future")
+    .sort((a, b) => (a.layer && a.layer !== "realm" ? 0 : 1) - (b.layer && b.layer !== "realm" ? 0 : 1));
+  const regions = shownRegions.map(r => regionSvg(m, r, `${epoch(byId(DB.entries, r.entry), year)} ${r.secret ? "secret" : ""} ${MAPV.sel?.region === r.id ? "sel" : ""}`)).join("");
   const draft = MAPV.draft.length ? `<polyline class="draft" points="${MAPV.draft.map(p => p[0] * m.w + "," + p[1] * m.h).join(" ")}"/>${MAPV.draft.map(p => `<circle class="draft-pt" cx="${p[0] * m.w}" cy="${p[1] * m.h}" r="5"/>`).join("")}` : "";
   const pins = m.pins.map(p => {
     const e = byId(DB.entries, p.entry), ep = epoch(e, year);
@@ -78,10 +193,8 @@ addRoute("map", "map", (id, focusPin) => {
     return `<div class="pin ${ep} ${p.secret ? "secret" : ""} ${MAPV.sel?.pin === p.id ? "sel" : ""} ${p.map ? "has-map" : ""}" data-pin="${p.id}" style="left:${p.x * m.w}px;top:${p.y * m.h}px;--c:${e ? entryColor(e) : "#e3c27a"}">
       <div class="pin-in"><span class="pin-dot">${e ? kindOf(e).icon : p.map ? "🗺" : "•"}</span><span class="pin-label">${esc(label)}</span></div></div>`;
   }).join("");
-  const regionLabels = m.regions.map(r => {
-    const e = byId(DB.entries, r.entry), ep = epoch(e, year), c = regionCenter(r);
-    return ep === "future" ? "" : `<div class="region-label ${ep}" style="left:${c.x * m.w}px;top:${c.y * m.h}px"><span>${esc(e ? e.name : r.label || "")}</span></div>`;
-  }).join("");
+  const regionLabels = shownRegions.map(r => regionLabel(m, r, epoch(byId(DB.entries, r.entry), year))).join("");
+  const layersUsed = Object.keys(REGION_LAYERS).filter(l => m.regions.some(r => (REGION_LAYERS[r.layer] ? r.layer : "realm") === l));
   const party = DB.party?.map === m.id ? `<div class="party-marker" style="left:${DB.party.x * m.w}px;top:${DB.party.y * m.h}px" title="The party"><div class="pin-in">
     <svg viewBox="0 0 24 28" width="26" height="30"><path d="M12 1 L22 5 V13 C22 20 17 25 12 27 C7 25 2 20 2 13 V5 Z" fill="#5fc9c4" stroke="#0b0a12" stroke-width="2"/><path d="M12 6 V22 M7 11 H17" stroke="#0b0a12" stroke-width="2"/></svg></div></div>` : "";
   return [`<div class="map-page ${MAPV.sel ? "with-side" : ""}">
@@ -89,11 +202,13 @@ addRoute("map", "map", (id, focusPin) => {
       <div class="crumbs">${trail.map(t => `<a href="#/map/${t.id}">${esc(t.name)}</a> › `).join("")}<b>${esc(m.name)}</b></div>
       <select data-change="mapJump" title="Go to another map">${DB.maps.map(x => `<option value="${x.id}" ${x === m ? "selected" : ""}>🗺 ${esc(x.name)}</option>`).join("")}</select>
       <div class="tool-group">${tools.map(([t, i, l, tip]) => `<button class="tool ${MAPV.tool === t ? "on" : ""}" data-act="mapTool" data-t="${t}" title="${tip}">${i}<span>${l}</span></button>`).join("")}</div>
-      ${MAPV.tool === "region" ? `<span class="hint">${MAPV.draft.length < 3 ? "Tap to add corners" : `<button class="btn small accent" data-act="finishRegion">Finish region</button>`} <button class="btn small ghost" data-act="cancelDraft">Cancel</button></span>` : ""}
+      ${MAPV.tool === "region" ? `<span class="hint"><span class="seg"><button class="${MAPV.free ? "" : "on"}" data-act="regionMode" data-v="">Corners</button><button class="${MAPV.free ? "on" : ""}" data-act="regionMode" data-v="1">Freehand</button></span>
+        ${MAPV.free ? "Drag round the region" : MAPV.draft.length < 3 ? "Tap to add corners" : `<button class="btn small accent" data-act="finishRegion">Finish region</button>`} <button class="btn small ghost" data-act="cancelDraft">Cancel</button></span>` : ""}
       <button class="btn small" data-act="drawOpen" data-kind="map" data-id="${m.id}" title="Draw on this map">✏ Draw</button>
       ${MAPV.movePin ? `<span class="hint">Tap where the pin should go <button class="btn small ghost" data-act="cancelMove">Cancel</button></span>` : ""}
       <div class="spacer"></div>
       <button class="btn small ${screenIs("map", m.id) ? "live" : ""}" data-act="screenMap" data-id="${m.id}" title="Put this map on the player screen (secret pins stay hidden)">📺 ${screenIs("map", m.id) ? "On screen" : "Show players"}</button>
+      ${layersUsed.length > 1 || (m.hide || []).length ? `<button class="btn small" data-act="mapLayers" data-id="${m.id}" title="Show or hide realms, climate, landscape and magic">◫ Layers${(m.hide || []).length ? ` <small>${layersUsed.length - (m.hide || []).filter(l => layersUsed.includes(l)).length}/${layersUsed.length}</small>` : ""}</button>` : ""}
       <button class="btn small" data-act="mapMenu" data-id="${m.id}">⋯ Map</button>
     </div>
     <div class="map-years"><span>${esc(fmtYear(minY))}</span>
@@ -105,6 +220,7 @@ addRoute("map", "map", (id, focusPin) => {
         <div class="map-layer" id="mapLayer" style="width:${m.w}px;height:${m.h}px">${mapBg(m)}${drawingHtml(m.draw, { w: m.w, h: m.h })}
           <svg class="map-svg" viewBox="0 0 ${m.w} ${m.h}" width="${m.w}" height="${m.h}">${regions}${MAP_OVERLAYS.map(f => f(m)).join("")}${draft}</svg>${regionLabels}${pins}${party}</div>
         <div class="zoom-btns"><button data-act="mapZoom" data-k="1.4">+</button><button data-act="mapZoom" data-k="0.7">−</button><button data-act="mapFit" title="Fit">⤢</button></div>
+        ${MAPV.noLegend ? `<button class="legend-btn" data-act="mapLegend" title="Legend">◫</button>` : mapLegend(m, shownRegions).replace(`<div class="map-legend">`, `<div class="map-legend"><button class="x" data-act="mapLegend" aria-label="Hide the legend">×</button>`)}
       </div>
       ${MAPV.sel ? `<aside class="map-side">${sidePanel(m)}</aside>` : ""}
     </div></div>`, main => wireMap(main, m, !!focusPin)];
@@ -138,7 +254,9 @@ function sidePanel(m) {
       ${child ? `<a class="btn accent wide" href="#/map/${child.id}">Open ${esc(child.name)} →</a>` : ""}
       ${sections.join("") || `<p class="muted">Nothing else is connected to ${esc(e.name)} yet.</p>`}`;
   } else {
-    body = `<h3>${esc(thing.label || (pin ? "Pin" : "Region"))}</h3>${child ? `<a class="btn accent wide" href="#/map/${child.id}">Open ${esc(child.name)} →</a>` : ""}<p class="muted">Not tied to a codex entry.</p>`;
+    const z = reg && regionLook(reg).z;
+    body = `<h3>${esc(thing.label || (z ? z[0] : pin ? "Pin" : "Region"))}</h3>${z ? `<p class="muted">${REGION_LAYERS[reg.layer][1]} ${esc(REGION_LAYERS[reg.layer][0])}: ${esc(z[0])}</p>` : ""}
+      ${child ? `<a class="btn accent wide" href="#/map/${child.id}">Open ${esc(child.name)} →</a>` : ""}<p class="muted">Not tied to a codex entry.</p>`;
   }
   return `<button class="x side-x" data-act="mapUnsel" aria-label="Close">×</button>${body}${tools}`;
 }
@@ -214,6 +332,31 @@ function wireMap(main, m, centreOnSel) {
   MAPV.view[m.id] = panZoom(stage, layer, m.w, m.h, MAPV.view[m.id], {
     centre: p ? { x: p.x * m.w, y: p.y * m.h } : null,
     onTap: (e, px, py) => mapTap(m, e, px / m.w, py / m.h),
+    skip: e => MAPV.tool === "region" && MAPV.free && !e.target.closest(".map-legend, .legend-btn"),
+  });
+  // freehand regions: drag round the shape
+  stage.addEventListener("pointerdown", e => {
+    if (!(MAPV.tool === "region" && MAPV.free) || e.target.closest(".zoom-btns, .map-legend, .legend-btn")) return;
+    e.preventDefault();
+    const svg = $(".map-svg", layer), k = () => MAPV.view[m.id].k;
+    const pts = [];
+    const add = ev => { const q = stage._toLayer(ev.clientX, ev.clientY); const l = pts[pts.length - 1]; if (!l || Math.hypot(l[0] - q.x, l[1] - q.y) > 6 / k()) pts.push([clamp(q.x, 0, m.w), clamp(q.y, 0, m.h)]); };
+    svg.insertAdjacentHTML("beforeend", `<polyline class="draft" id="freeDraft"/>`);
+    const line = $("#freeDraft", svg);
+    const mv = ev => { add(ev); line.setAttribute("points", pts.map(q => q.join(",")).join(" ")); };
+    add(e);
+    stage.setPointerCapture(e.pointerId);
+    stage.addEventListener("pointermove", mv);
+    stage.addEventListener("pointerup", () => {
+      stage.removeEventListener("pointermove", mv);
+      line.remove();
+      // keep the shape, not every wobble of the hand
+      const keep = [];
+      for (const q of pts) { const l = keep[keep.length - 1]; if (!l || Math.hypot(l[0] - q[0], l[1] - q[1]) > 14 / k()) keep.push(q); }
+      if (keep.length < 3) return toast("Drag all the way round the region");
+      MAPV.draft = keep.map(q => [q[0] / m.w, q[1] / m.h]);
+      ACT.finishRegion();
+    }, { once: true });
   });
 }
 
@@ -259,8 +402,8 @@ ACT.cancelDraft = () => { MAPV.draft = []; MAPV.tool = "pan"; rerender(); };
 ACT.cancelMove = () => { MAPV.movePin = null; rerender(); };
 ACT.finishRegion = () => {
   const m = byId(DB.maps, MAPV.cur);
-  const r = { id: uid(), pts: MAPV.draft.slice(), entry: "", label: "", color: "" };
-  MAPV.draft = []; MAPV.tool = "pan";
+  const r = { id: uid(), pts: MAPV.draft.slice(), entry: "", label: "", color: "", smooth: !!MAPV.free, layer: MAPV.lastLayer || "realm", zone: MAPV.lastZone || "" };
+  MAPV.draft = []; if (!MAPV.free) MAPV.tool = "pan";
   regionEditor(m, r, true);
 };
 
@@ -271,7 +414,7 @@ function placeFields(thing, isPin, m) {
     <div class="row2">${textField("…or create a new entry called", "newName", "")}${field("as a", `<select name="newKind">${kinds}</select>`)}</div>
     ${textField("Label (when it's not an entry)", "label", thing.label)}
     <label class="check"><input type="checkbox" name="secret" ${thing.secret ? "checked" : ""}> Hidden from the players (not drawn on the player screen)</label>
-    ${isPin ? field("Opens another map", `<select name="map"><option value="">—</option>${DB.maps.filter(x => x !== m).map(x => `<option value="${x.id}" ${x.id === thing.map ? "selected" : ""}>🗺 ${esc(x.name)}</option>`).join("")}<option value="__new">+ a new map…</option></select>`) : colorField("Colour", "color", thing.color)}`;
+    ${isPin ? field("Opens another map", `<select name="map"><option value="">—</option>${DB.maps.filter(x => x !== m).map(x => `<option value="${x.id}" ${x.id === thing.map ? "selected" : ""}>🗺 ${esc(x.name)}</option>`).join("")}<option value="__new">+ a new map…</option></select>`) : ""}`;
 }
 function readPlace(v, thing) {
   if (v.newName.trim()) {
@@ -298,11 +441,27 @@ function pinEditor(m, pin, isNew) {
     } }] });
 }
 function regionEditor(m, r, isNew) {
-  modal({ title: isNew ? "New region" : "Edit region", body: placeFields(r, false, m),
+  const cur = REGION_LAYERS[r.layer] && r.layer !== "realm" && r.zone ? r.layer + ":" + r.zone : "realm";
+  const opt = (v, l, sel) => `<option value="${v}" ${v === sel ? "selected" : ""}>${esc(l)}</option>`;
+  const look = `<details class="field-ed" ${isNew || r.fill || r.border || r.op != null || r.labelSize ? "open" : ""}><summary>Look</summary><div class="row2">
+      ${field("Fill", `<select name="fill">${opt("", "As the kind of region has it", r.fill || "")}${Object.entries(REGION_FILLS).map(([k, l]) => opt(k, l, r.fill)).join("")}</select>`)}
+      ${field("Border", `<select name="border">${opt("", "As the kind of region has it", r.border || "")}${Object.entries(REGION_BORDERS).map(([k, l]) => opt(k, l, r.border)).join("")}</select>`)}
+      ${field("How strong", `<input type="range" name="op" min="0.05" max="0.8" step="0.05" value="${r.op ?? (cur === "realm" ? 0.22 : 0.32)}">`)}
+      ${field("Label size", `<select name="labelSize">${[["s", "Small"], ["m", "Medium"], ["l", "Large"], ["xl", "Huge"]].map(([k, l]) => opt(k, l, r.labelSize || "m")).join("")}</select>`)}</div>
+      <label class="check"><input type="checkbox" name="smooth" ${r.smooth ? "checked" : ""}> Smooth the edges</label>
+      ${colorField("Colour (none: the kind's own colour)", "color", r.color)}</details>`;
+  const kinds = field("What it marks", `<select name="zone">${opt("realm", "🏰 A realm, nation or place", cur)}
+      ${Object.entries(ZONES).map(([l, zs]) => `<optgroup label="${REGION_LAYERS[l][1]} ${REGION_LAYERS[l][0]}">${Object.entries(zs).map(([k, z]) => opt(l + ":" + k, z[0], cur)).join("")}</optgroup>`).join("")}</select>`);
+  modal({ title: isNew ? "New region" : "Edit region", body: kinds + placeFields(r, false, m) + look,
     buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
       const v = formVals(w);
       readPlace(v, r);
       r.color = v.color;
+      [r.layer, r.zone = ""] = v.zone.split(":");
+      if (r.layer === "realm") r.zone = "";
+      MAPV.lastLayer = r.layer; MAPV.lastZone = r.zone;
+      r.fill = v.fill; r.border = v.border; r.op = +v.op; r.labelSize = v.labelSize === "m" ? "" : v.labelSize; r.smooth = v.smooth;
+      for (const k of ["fill", "border", "labelSize", "zone"]) if (!r[k]) delete r[k];
       if (isNew) m.regions.push(r);
       MAPV.sel = { region: r.id };
       commit();
@@ -313,6 +472,20 @@ ACT.pinEdit = el => pinEditor(curMap(), curMap().pins.find(p => p.id === el.data
 ACT.regionEdit = el => regionEditor(curMap(), curMap().regions.find(r => r.id === el.dataset.id), false);
 ACT.pinMove = el => { MAPV.movePin = el.dataset.id; rerender(); };
 ACT.pinDelete = el => { const m = curMap(); MAPV.sel = null; withUndo("Pin removed", () => { m.pins = m.pins.filter(p => p.id !== el.dataset.id); }); };
+ACT.regionMode = el => { MAPV.free = !!el.dataset.v; MAPV.draft = []; rerender(); };
+ACT.mapLegend = () => { MAPV.noLegend = !MAPV.noLegend; rerender(); };
+ACT.mapLayers = el => {
+  const m = byId(DB.maps, el.dataset.id);
+  const count = l => m.regions.filter(r => (REGION_LAYERS[r.layer] ? r.layer : "realm") === l).length;
+  modal({ title: "Layers", body: `<p class="muted">What this map shows, here and on the player screen.</p>
+      ${Object.entries(REGION_LAYERS).filter(([l]) => count(l)).map(([l, [name, icon]]) => `<label class="check"><input type="checkbox" name="${l}" ${(m.hide || []).includes(l) ? "" : "checked"}> ${icon} ${esc(name)} <small class="muted">${plural(count(l), "region")}</small></label>`).join("")}`,
+    buttons: [{ label: "Cancel" }, { label: "Show these", cls: "accent", act: w => {
+      const v = formVals(w);
+      m.hide = Object.keys(REGION_LAYERS).filter(l => v[l] === false);
+      if (!m.hide.length) delete m.hide;
+      commit();
+    } }] });
+};
 ACT.regionDelete = el => { const m = curMap(); MAPV.sel = null; withUndo("Region removed", () => { m.regions = m.regions.filter(r => r.id !== el.dataset.id); }); };
 
 /* maps themselves */

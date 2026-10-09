@@ -49,40 +49,138 @@ const lifespan = e => {
   return bits.join(" · ");
 };
 
-/* ── the codex list ── */
-const SORTS = { az: "A to Z", recent: "Recently changed", born: "Oldest first (in the world)" };
+/* ── the codex list ── ordered one way and grouped another: grouped by kind,
+   by tag, or by any choice, yes/no or link field (Role in the story, Status,
+   Allegiance…), with choice groups in the order the choices are listed. */
+const SORTS = { az: "A to Z", za: "Z to A", recent: "Recently changed", added: "Newest in the codex", born: "Oldest first (in the world)",
+  young: "Youngest first (in the world)", story: "Order of appearance in the story", linked: "Most connected" };
+try { Object.assign(CODEX, JSON.parse(localStorage.getItem("moth_codex_view") || "{}")); } catch {}
+const keepCodexView = () => { try { localStorage.setItem("moth_codex_view", JSON.stringify({ sort: CODEX.sort, group: CODEX.group })); } catch {} };
+const GROUPABLE = new Set(["choice", "yesno", "link", "links"]);
+// the fields worth grouping or ordering by, by name, across the kinds in view
+function codexFields(kinds, types) {
+  const out = new Map();
+  for (const k of kinds) for (const f of k.fields) if (types.has(f.type)) {
+    const n = norm(f.name);
+    const o = out.get(n) || out.set(n, { name: f.name, type: f.type, opts: [], kinds: 0 }).get(n);
+    o.kinds++;
+    for (const c of f.opts || []) if (!o.opts.includes(c)) o.opts.push(c);
+  }
+  return [...out].sort((a, b) => b[1].kinds - a[1].kinds || a[1].name.localeCompare(b[1].name));
+}
+const fieldOf = (e, n) => kindOf(e).fields.find(f => norm(f.name) === n);
+// the values an entry is grouped under for a field (links: every entry linked)
+function groupVals(e, n) {
+  const f = fieldOf(e, n), v = f && e.fields?.[f.id];
+  if (!f || isEmptyVal(v) && f.type !== "yesno") return [];
+  if (f.type === "yesno") return [v ? "Yes" : "No"];
+  if (f.type === "link" || f.type === "links") return (Array.isArray(v) ? v : [v]).filter(id => byId(DB.entries, id)).map(id => "e:" + id);
+  return [String(v)];
+}
+// where each entry first turns up in the story, in reading order: a chapter's
+// summary, then its scenes (POV, setting, or mentioned)
+function storyOrder() {
+  return derived("storyOrder", () => {
+    const first = new Map();
+    let i = 0;
+    const see = ids => { for (const id of ids) if (id && !first.has(id)) first.set(id, i); i++; };
+    const named = text => mentionsIn(text || "").filter(m => m.t === "e").map(m => m.it.id);
+    for (const book of DB.books) for (const ch of book.chapters || []) {
+      see(named(ch.summary));
+      for (const sc of ch.scenes || []) see([sc.pov, sc.setting, ...named(sc.summary + "\n" + sc.body)]);
+    }
+    return first;
+  });
+}
+function codexSorter(sort) {
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const life = (a, b, dir) => { const x = dateKey(a.start), y = dateKey(b.start); return x === y ? byName(a, b) : x === -Infinity ? 1 : y === -Infinity ? -1 : (x - y) * dir; };
+  if (sort === "za") return (a, b) => -byName(a, b);
+  if (sort === "recent") return (a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0);
+  if (sort === "added") return (a, b) => (b.created || 0) - (a.created || 0) || byName(a, b);
+  if (sort === "born") return (a, b) => life(a, b, 1);
+  if (sort === "young") return (a, b) => life(a, b, -1);
+  if (sort === "story") { const o = storyOrder(); return (a, b) => (o.get(a.id) ?? Infinity) - (o.get(b.id) ?? Infinity) || byName(a, b); }
+  if (sort === "linked") { const n = e => backlinks("e", e.id).length + relsOf(e).length; return (a, b) => n(b) - n(a) || byName(a, b); }
+  if (sort?.startsWith("f:")) {
+    // by a choice field, in the order its choices are listed; then by a number field, highest first
+    const n = sort.slice(2);
+    const rank = e => { const f = fieldOf(e, n), v = f && e.fields?.[f.id]; if (!f || isEmptyVal(v)) return Infinity; return f.type === "number" ? -(+v || 0) : (f.opts || []).indexOf(v) + 1 || 999; };
+    return (a, b) => rank(a) - rank(b) || byName(a, b);
+  }
+  return byName;
+}
 addRoute("codex", "codex", kind => {
   if (kind !== undefined) CODEX.kind = kind;
   CODEX.sort ||= "az";
   const q = norm(CODEX.q);
-  const sorter = { az: (a, b) => a.name.localeCompare(b.name), recent: (a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0),
-    born: (a, b) => dateKey(a.start) - dateKey(b.start) || a.name.localeCompare(b.name) }[CODEX.sort];
+  const inView = CODEX.kind ? DB.kinds.filter(k => k.id === CODEX.kind) : DB.kinds;
+  const groupFields = codexFields(inView, GROUPABLE), sortFields = codexFields(inView, new Set(["choice", "number"]));
+  if (CODEX.sort.startsWith("f:") && !sortFields.some(([n]) => "f:" + n === CODEX.sort)) CODEX.sort = "az";
+  let group = CODEX.group || "kind";
+  if (group.startsWith("f:") && !groupFields.some(([n]) => "f:" + n === group)) group = "kind";
+  if (group === "kind" && CODEX.kind) group = "none";
   const list = DB.entries.filter(e =>
     (!CODEX.kind || e.kind === CODEX.kind) &&
     (!CODEX.tag || (e.tags || []).includes(CODEX.tag)) &&
     (!q || [e.name, ...(e.aliases || []), e.summary, ...(e.tags || [])].some(s => norm(s).includes(q)))
-  ).sort(sorter);
+  ).sort(codexSorter(CODEX.sort));
   const counts = k => DB.entries.filter(e => e.kind === k).length;
-  // "All" is grouped by kind, in the kinds' own order, so it reads like a contents page
-  const groups = CODEX.kind ? [[null, list]] : DB.kinds.map(k => [k, list.filter(e => e.kind === k.id)]).filter(([, l]) => l.length)
-    .concat([[{ id: "", name: "Other", icon: "◆" }, list.filter(e => !byId(DB.kinds, e.kind))]].filter(([, l]) => l.length));
+  // groups: [heading html, entries]
+  let groups;
+  const newBtn = k => `<button class="btn small ghost" data-act="newEntry" data-kind="${k.id}">+ ${esc(k.name)}</button>`;
+  if (group === "kind") {
+    // "All" is grouped by kind, in the kinds' own order, so it reads like a contents page
+    groups = DB.kinds.map(k => [`<a href="#/codex/${k.id}">${k.icon} ${esc(kindPlural(k.name))}</a>`, list.filter(e => e.kind === k.id), k.color, newBtn(k)])
+      .concat([["◆ Other", list.filter(e => !byId(DB.kinds, e.kind))]]);
+  } else if (group === "tag") {
+    const tags = [...new Set(list.flatMap(e => e.tags || []))].sort((a, b) => a.localeCompare(b));
+    groups = tags.map(t => [`<a data-act="codexTag" data-tag="${esc(t)}">#${esc(t)}</a>`, list.filter(e => (e.tags || []).includes(t))])
+      .concat([["No tags", list.filter(e => !(e.tags || []).length)]]);
+  } else if (group.startsWith("f:")) {
+    const n = group.slice(2), info = groupFields.find(([x]) => x === n)[1];
+    const vals = new Map();
+    for (const e of list) for (const v of groupVals(e, n)) (vals.get(v) || vals.set(v, []).get(v)).push(e);
+    const keys = [...vals.keys()].sort((a, b) => {
+      const ia = info.opts.indexOf(a), ib = info.opts.indexOf(b);
+      if (ia >= 0 || ib >= 0) return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+      if (a === "Yes" || b === "No") return -1;
+      if (a === "No" || b === "Yes") return 1;
+      const na = a.startsWith("e:") ? byId(DB.entries, a.slice(2)).name : a, nb = b.startsWith("e:") ? byId(DB.entries, b.slice(2)).name : b;
+      return na.localeCompare(nb);
+    });
+    groups = keys.map(v => {
+      if (!v.startsWith("e:")) return [esc(v), vals.get(v)];
+      const to = byId(DB.entries, v.slice(2));
+      return [`<a href="#/e/${to.id}">${kindOf(to).icon} ${esc(to.name)}</a>`, vals.get(v), entryColor(to)];
+    }).concat([[`No ${esc(info.name.toLowerCase())}`, list.filter(e => !groupVals(e, n).length)]]);
+  } else groups = [[null, list]];
+  groups = groups.filter(([, l]) => l.length);
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`;
   return `<div class="page">
     <div class="page-h"><h2>Codex</h2><div class="spacer"></div>
       ${searchBox("codexFilter", CODEX.q, "Filter the codex…")}
-      <select data-change="codexSort" title="Order">${Object.entries(SORTS).map(([k, l]) => `<option value="${k}" ${k === CODEX.sort ? "selected" : ""}>${l}</option>`).join("")}</select>
       <button class="btn accent" data-act="newEntry" data-kind="${CODEX.kind}">+ New ${esc(CODEX.kind ? byId(DB.kinds, CODEX.kind)?.name || "entry" : "entry")}</button></div>
     <div class="chips-row">
       <a class="fchip ${!CODEX.kind ? "on" : ""}" href="#/codex/">All <small>${DB.entries.length}</small></a>
       ${DB.kinds.map(k => { const n = counts(k.id); return `<a class="fchip ${CODEX.kind === k.id ? "on" : ""} ${n ? "" : "none"}" href="#/codex/${k.id}" style="--c:${k.color}">${k.icon} ${esc(k.name)} <small>${n}</small></a>`; }).join("")}
       ${CODEX.tag ? `<button class="fchip on" data-act="codexTag" data-tag="">#${esc(CODEX.tag)} ✕</button>` : ""}
     </div>
-    ${list.length ? groups.map(([k, l]) => `${k ? `<h3 class="codex-group" style="--c:${k.color || "var(--ink-dim)"}"><a href="#/codex/${k.id}">${k.icon} ${esc(kindPlural(k.name))}</a> <small>${l.length}</small>
-        <button class="btn small ghost" data-act="newEntry" data-kind="${k.id}">+ ${esc(k.name)}</button></h3>` : ""}
+    <div class="codex-view">
+      <label class="inline">Order <select data-change="codexSort">${Object.entries(SORTS).map(([k, l]) => opt(k, l, CODEX.sort)).join("")}
+        ${sortFields.length ? `<optgroup label="By a field">${sortFields.map(([n, f]) => opt("f:" + n, "By " + f.name.toLowerCase() + (f.type === "number" ? " (highest first)" : ""), CODEX.sort)).join("")}</optgroup>` : ""}</select></label>
+      <label class="inline">Group by <select data-change="codexGroup">
+        ${CODEX.kind ? "" : opt("kind", "Kind", group)}${opt("none", "Nothing", group)}${opt("tag", "Tag", group)}
+        ${groupFields.length ? `<optgroup label="A field">${groupFields.map(([n, f]) => opt("f:" + n, f.name, group)).join("")}</optgroup>` : ""}</select></label>
+      <span class="muted">${plural(list.length, "entry")}</span>
+    </div>
+    ${list.length ? groups.map(([h, l, c, extra]) => `${h ? `<h3 class="codex-group" style="--c:${c || "var(--ink)"}"><span>${h}</span> <small>${l.length}</small>${extra || ""}</h3>` : ""}
       <div class="cards">${l.map(entryCard).join("")}</div>`).join("")
       : empty(DB.entries.length ? "Nothing matches." : "The codex is empty. Add a first character, place or legend.")}
   </div>`;
 });
-ACT.codexSort = el => { CODEX.sort = el.value; rerender(); };
+ACT.codexSort = el => { CODEX.sort = el.value; keepCodexView(); rerender(); };
+ACT.codexGroup = el => { CODEX.group = el.value; keepCodexView(); rerender(); };
 function entryCard(e) {
   const k = kindOf(e);
   return `<a class="card" href="#/e/${e.id}" style="--c:${entryColor(e)}">
