@@ -99,7 +99,7 @@ function mergeWorld(incoming, { calendar = false } = {}) {
   }
 
   // everything else: added unless it's already here
-  for (const k of ["events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps"]) {
+  for (const k of ["events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups"]) {
     let n = 0;
     for (const raw of inc[k]) {
       if (byId(DB[k], raw.id)) continue;

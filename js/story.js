@@ -48,8 +48,8 @@ function statusBar(scenes) {
   return `<div class="status-bar">${Object.entries(STATUSES).map(([k, [, c]]) => { const m = scenes.filter(s => (s.status || "idea") === k).length; return m ? `<i style="flex:${m / n};background:${c}" title="${m} ${k}"></i>` : ""; }).join("")}</div>`;
 }
 
-addRoute("story", "story", () => `<div class="page">
-  <div class="page-h"><h2>Story</h2><div class="spacer"></div><button class="btn accent" data-act="newBook">+ Book</button></div>
+addRoute("story", "story", () => `<div class="page">${storyTabs("story")}
+  <div class="page-h"><h2>Books</h2><div class="spacer"></div><button class="btn accent" data-act="newBook">+ Book</button></div>
   <div class="cards books">${DB.books.map(b => {
     const scenes = (b.chapters || []).flatMap(c => c.scenes || []), w = bookWords(b);
     return `<a class="card book-card" href="#/book/${b.id}"><div class="card-b"><b>📖 ${esc(b.title)}</b>
@@ -64,6 +64,7 @@ addRoute("book", "story", id => {
   return `<div class="page narrow">
     <div class="crumbs"><a href="#/story">Story</a> ›</div>
     <div class="page-h"><h2>📖 ${esc(b.title)}</h2><div class="spacer"></div>
+      <a class="btn accent" href="#/plan/${b.id}">Plan</a>
       <a class="btn" href="#/read/${b.id}">Read it all</a>
       <button class="btn" data-act="exportBook" data-id="${b.id}">Export .md</button>
       <button class="btn" data-act="editBook" data-id="${b.id}">Edit</button>
@@ -106,6 +107,7 @@ addRoute("sc", "story", id => {
       <button class="btn small ghost" data-act="deleteScene" data-id="${sc.id}" title="Delete scene">🗑</button>
     </div>
     <input class="scene-sum" value="${esc(sc.summary || "")}" placeholder="What happens, in a line" data-input="sceneSummary" data-id="${sc.id}" data-links>
+    ${scenePlanHtml(sc, book)}
     ${STORY.read ? `<div class="prose manuscript">${md(sc.body) || empty("Nothing written yet.")}</div>`
       : `<textarea class="manuscript-ed" data-input="sceneBody" data-id="${sc.id}" placeholder="Write. [[Name]] links to the codex.">${esc(sc.body || "")}</textarea>`}
     <div class="writer-foot"><span id="wc">${wcText(sc)}</span><span id="saved" class="muted"></span><span class="spacer"></span>

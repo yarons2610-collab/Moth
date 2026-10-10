@@ -3,7 +3,7 @@
 // The app's own files are fetched network-first, so a new version reaches an
 // installed phone on its next launch, and the cache is the offline fallback.
 // Bump the version when the file list changes.
-const CACHE = "moth-v9";
+const CACHE = "moth-v10";
 const SHELL = [
   "./", "index.html", "manifest.json", "css/moth.css", "vendor/fonts.css",
   "vendor/fonts/jetbrains-mono-latin.woff2", "vendor/fonts/space-grotesk-latin.woff2",

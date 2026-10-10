@@ -151,16 +151,37 @@ function sampleWorld() {
   ev("The crown surfaces", { y: AF(312), m: 4, d: 20 }, ["maren", "crown", "weir"], "[[Maren Vey]] finds it in her nets. Nets do not reach forty fathoms.", { color: "#e3c27a" });
 
   const sc = (title, status, pov, setting, date, body, summary = "") => ({ id: uid(), title, status, pov: pov ? E[pov].id : "", setting: setting ? E[setting].id : "", date, body, summary });
-  db.books.push({ id: uid(), title: "The Drowned Crown", summary: "A smuggler finds a crown that should be at the bottom of the sea, and everyone she owes wants it.", target: 90000, chapters: [
+  // the planning: threads, a theme, a structure, setups
+  const T = { main: uid(), maren: uid(), debt: uid(), lamps: uid() }, TH = uid();
+  const plan = (s, o) => Object.assign(s, o);
+  db.themes.push({ id: TH, name: "What the sea gives back", color: "#7ea8f8", question: "Can you keep what you didn't earn?", statement: "What the sea gives back, it takes again, unless it is given away.",
+    counter: "[[Isel Tarrow|Isel]]: everything has a price, and paying it is the only honest thing.", motifs: "Tides, debts, lamps lit for someone who isn't coming home.", symbols: [E.crown.id] });
+  db.threads.push(
+    { id: T.main, name: "The crown", kind: "main", state: "open", color: "#e3c27a", summary: "Who gets the [[The Drowned Crown|crown]], and what it costs them.", themes: [TH],
+      arc: { question: "Will Maren keep the crown, sell it, or give it back to the sea?", stakes: "Her brother, her boat, the Weir." }, beats: [
+        { id: uid(), text: "Maren hides the crown from Isel's collector", scene: "", done: true }, { id: uid(), text: "Jory takes it to Gullwatch", scene: "", done: false },
+        { id: uid(), text: "Down to the palace: someone is still living there", scene: "", done: false }, { id: uid(), text: "Isel takes Jory to force a trade", scene: "", done: false }] },
+    { id: T.maren, name: "Maren learns to ask for help", kind: "character", state: "open", color: "#5fc9c4", character: E.maren.id, themes: [TH],
+      arc: { want: "To pay Isel off and owe nobody anything.", need: "To let someone carry part of the weight.", lie: "Owing someone makes you theirs.", truth: "Some debts are what hold people together.", from: "Alone in her boat.", to: "Asking Jory, and meaning it." }, beats: [] },
+    { id: T.debt, name: "Isel's debt", kind: "conflict", state: "open", color: "#e07a5f", people: [E.isel.id, E.maren.id], arc: { sides: "Maren against the Saltward Guild", stakes: "Maren's freedom" }, beats: [] },
+    { id: T.lamps, name: "Who lights the lamps?", kind: "mystery", state: "planned", color: "#b9a6ff", arc: { question: "Who has been lighting the lamps in [[The Sunken Palace]]?", answer: "(Don't decide yet.)" }, beats: [] });
+  db.books.push({ id: uid(), title: "The Drowned Crown", summary: "A smuggler finds a crown that should be at the bottom of the sea, and everyone she owes wants it.", target: 90000, structure: "three",
+    beatNotes: { "three:inciting-incident": "The crown in the nets, the night before the book opens." }, chapters: [
     { id: uid(), title: "Low Tide", scenes: [
-      sc("The Debt", "done", "maren", "weir", { y: AF(312), m: 4, d: 21 }, "The tide was out and the Weir smelled of it.\n\nMaren had the crown wrapped in oilcloth under the floor of the boat, and [[Isel Tarrow]]'s man had his boots on top of it.\n\n“The Guildmistress sends her regards,” he said. “And her arithmetic.”", "Isel's collector comes calling while the crown is hidden under his feet."),
-      sc("Lantern at Gullwatch", "draft", "maren", "gullwatch", { y: AF(312), m: 4, d: 22 }, "[[Jory Vey|Jory]] had the lamp lit early. He always did when he was scared.", "Maren asks her brother to hide the crown."),
+      plan(sc("The Debt", "done", "maren", "weir", { y: AF(312), m: 4, d: 21 }, "The tide was out and the Weir smelled of it.\n\nMaren had the crown wrapped in oilcloth under the floor of the boat, and [[Isel Tarrow]]'s man had his boots on top of it.\n\n“The Guildmistress sends her regards,” he said. “And her arithmetic.”", "Isel's collector comes calling while the crown is hidden under his feet."),
+        { goal: "Get rid of the collector without him finding the crown.", conflict: "He's standing on it.", outcome: "Yes, but…", tension: 6, beat: "three:hook", threads: [T.main, T.debt], themes: [TH] }),
+      plan(sc("Lantern at Gullwatch", "draft", "maren", "gullwatch", { y: AF(312), m: 4, d: 22 }, "[[Jory Vey|Jory]] had the lamp lit early. He always did when he was scared.", "Maren asks her brother to hide the crown."), { tension: 3, threads: [T.main, T.maren] }),
     ] },
     { id: uid(), title: "Under the Weir", scenes: [
-      sc("The Diving Bell", "outline", "maren", "palace", null, "- Pell gets the Guild's old diving bell\n- They go down to the palace\n- The throne room is dry, and someone has lit the lamps", "Maren and Pell go down."),
-      sc("What Isel Wants", "idea", "isel", "saltmere", null, "", "Isel's side of it."),
+      plan(sc("The Diving Bell", "outline", "maren", "palace", null, "- Pell gets the Guild's old diving bell\n- They go down to the palace\n- The throne room is dry, and someone has lit the lamps", "Maren and Pell go down."), { tension: 8, beat: "three:first-plot-point", threads: [T.main, T.lamps] }),
+      plan(sc("What Isel Wants", "idea", "isel", "saltmere", null, "", "Isel's side of it."), { tension: 5, threads: [T.debt], themes: [TH] }),
     ] },
   ] });
+
+  const scs = db.books[0].chapters.flatMap(c => c.scenes), mainBeats = db.threads[0].beats;
+  mainBeats[0].scene = scs[0].id; mainBeats[1].scene = scs[1].id; mainBeats[2].scene = scs[2].id;
+  db.setups.push({ id: uid(), text: "The collector's boots are wet to the knee, at low tide.", setup: scs[0].id, payoff: "" },
+    { id: uid(), text: "Jory always lights the lamp early when he's scared.", setup: scs[1].id, payoff: "" });
 
   const map = { id: uid(), name: "The Saltcoast", asset: null, w: 1600, h: 1100, notes: "", pins: [], regions: [] };
   const city = { id: uid(), name: "Saltmere", asset: null, w: 1600, h: 1100, notes: "", pins: [], regions: [] };
