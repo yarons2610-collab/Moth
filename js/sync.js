@@ -21,7 +21,7 @@ const ls = {
   get: k => { try { return localStorage.getItem(SYNC_KEYS[k]) || ""; } catch { return ""; } },
   set: (k, v) => { try { v === "" || v == null ? localStorage.removeItem(SYNC_KEYS[k]) : localStorage.setItem(SYNC_KEYS[k], v); } catch {} },
 };
-const SYNC = { busy: false, applying: false, timer: null, state: "off", msg: "", last: 0 };
+const SYNC = { busy: false, applying: false, resolving: false, timer: null, state: "off", msg: "", last: 0 };
 // the player screen never syncs: it only reads what your window saves
 const syncOn = () => !PLAYER_MODE && !!ls.get("token");
 const backendName = () => ls.get("backend") || "gist";
@@ -199,9 +199,12 @@ async function applyRemote(remote) {
 }
 const remoteWorld = r => { try { return r.world ? JSON.parse(r.world) : null; } catch { return null; } };
 const isEmptyWorld = w => !w || !w.world;
+// nothing written on this device (a fresh install, or everything deleted):
+// there's nothing to lose by taking the other copy, so no need to ask
+const blankHere = () => !["entries", "books", "events", "notes", "maps", "threads", "themes", "encounters", "sessions"].some(k => DB[k]?.length);
 
 async function pull({ quiet = false } = {}) {
-  if (!syncOn() || SYNC.busy) return;
+  if (!syncOn() || SYNC.busy || SYNC.resolving) return;
   SYNC.busy = true;
   try {
     setSync("busy", "Checking for changes…");
@@ -212,7 +215,7 @@ async function pull({ quiet = false } = {}) {
     const w = remoteWorld(remote);
     if (isEmptyWorld(w)) { SYNC.busy = false; ls.set("dirty", "1"); return push(); }
     if (w.movedTo) { SYNC.busy = false; return followMove(w.movedTo); }
-    if (!ls.get("dirty") || (!ls.get("version") && !DB.entries.length)) {
+    if (!ls.get("dirty") || blankHere()) {
       await applyRemote(remote);
       if (!quiet) toast("Brought in changes from your other device");
       setSync("ok", "Up to date");
@@ -222,7 +225,7 @@ async function pull({ quiet = false } = {}) {
 }
 
 async function push() {
-  if (!syncOn() || SYNC.busy) return;
+  if (!syncOn() || SYNC.busy || SYNC.resolving) return;
   // nothing changed here, so nothing to send (sending anyway would make the
   // other device think there's a conflict)
   if (!ls.get("dirty") && ls.get("version")) return setSync("ok", "Up to date");
@@ -261,7 +264,20 @@ async function push() {
   if (ls.get("dirty") && SYNC.state !== "err") schedulePush();
 }
 
-function conflict(remote) {
+async function conflict(remote) {
+  // only ever one of these at a time: checks that run while it's open wait
+  if (SYNC.resolving) return;
+  if (blankHere()) {
+    try { await applyRemote(remote); setSync("ok", "Up to date"); toast("Brought in your world from your other device"); }
+    catch (e) { console.warn(e); setSync("err", e.message); }
+    return;
+  }
+  SYNC.resolving = true;
+  clearTimeout(SYNC.timer);
+  let chosen = false;
+  const done = () => { SYNC.resolving = false; };
+  // a backup that can't be saved (some phones refuse downloads) mustn't stop the choice
+  const backup = (name, data) => { try { download(name, JSON.stringify(data)); } catch (e) { console.warn(e); } };
   return new Promise(res => {
     const other = remoteWorld(remote);
     const when = t => t ? new Date(t).toLocaleString() : "unknown";
@@ -269,17 +285,24 @@ function conflict(remote) {
     modal({ title: "This world changed in two places",
       body: `<p>Since this device last synced, the world was changed on another device, and it has also changed here. Moth doesn't merge them. Pick the copy to keep; the other one is downloaded as a backup file, so nothing is lost.</p>
         <ul><li>This device: last edited ${when(DB.updated)}</li><li>The other device (on GitHub): last edited ${when(other?.updated)}</li></ul>`,
-      onClose: () => res(),
+      // closed without choosing: nothing changes until the next check asks again
+      onClose: () => { if (!chosen) { done(); setSync("err", "Two devices changed the world"); } res(); },
       buttons: [
         { label: "Keep the other device's", act: async () => {
-          download(fileSlug(DB.world.name) + "-this-device-backup.json", JSON.stringify(await exportBundle()));
-          try { await applyRemote(remote); setSync("ok", "Up to date"); } catch (e) { setSync("err", e.message); }
+          chosen = true;
+          setSync("busy", "Bringing in the other device's copy…");
+          try { backup(fileSlug(DB.world.name) + "-this-device-backup.json", await exportBundle()); } catch (e) { console.warn(e); }
+          try { await applyRemote(remote); setSync("ok", "Up to date"); toast("Now using the other device's copy"); }
+          catch (e) { console.warn(e); setSync("err", e.message); toast("Couldn't bring it in: " + e.message); }
+          done();
         } },
         { label: "Keep this device's", cls: "accent", act: async () => {
-          if (other) download(fileSlug(other.world?.name) + "-other-device-backup.json", JSON.stringify({ moth: 1, db: other, assets: {} }));
+          chosen = true;
+          if (other) backup(fileSlug(other.world?.name) + "-other-device-backup.json", { moth: 1, db: other, assets: {} });
           ls.set("version", remote.version);
           setKnown(Object.fromEntries(Object.entries(remote.files).map(([id, r]) => [id, r.path])));
           ls.set("dirty", "1");
+          done();
           await push();
         } },
       ] });
