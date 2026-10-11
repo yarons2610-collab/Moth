@@ -30,7 +30,7 @@ addRoute("settings", "", () => {
       <p class="muted">An export is one .json file with the whole world and its images.</p>
       <div class="btn-row"><button class="btn" data-act="exportWorld">Export</button><button class="btn" data-act="importWorld">Import…</button>
         <button class="btn" data-act="loadSample">Load the sample world</button><button class="btn danger" data-act="resetWorld">Start an empty world</button></div></section>
-    <p class="muted small">Moth: a play on myth. Works offline, and can be installed from the browser's menu (Add to Home Screen).</p>
+    <p class="muted small">Moth: a play on myth. Works offline, and can be installed from the browser's menu (Add to Home Screen). This is version <b id="appVersion">${APP_VERSION}</b>.</p>
   </div>`, showStorage];
 });
 
@@ -64,6 +64,8 @@ function syncConnectedHtml() {
   const name = backendName() === "repo" ? `the private repository <b>${esc(ls.get("repo"))}</b>` : "a private GitHub Gist";
   return `<p>Syncing through ${name}${where ? ` (<a href="${where}" target="_blank" rel="noopener">open it</a>)` : ""}.</p>
     <div class="btn-row"><button class="btn" data-act="syncNow">Sync now</button><button class="btn ghost" data-act="syncOff">Stop syncing on this device</button></div>
+    <p class="muted small" style="margin-top:10px">Stuck, or this device has the wrong world? Replace this device's copy with the one on GitHub (what's here is downloaded as a backup file first).</p>
+    <div class="btn-row"><button class="btn" data-act="syncTakeRemote">Replace this device's copy with GitHub's</button></div>
     ${backendName() === "gist" ? `<div class="move-box"><b>Move to a GitHub repository</b>
       <p class="muted small">A Gist holds about 300 files, and every picture is one. A private repository has no such limit, stores pictures as real image files (a quarter smaller) and saves each sync in one go.
         Your other devices follow the move by themselves; they just need a token that can use the repository (the steps are below the button).</p>
@@ -229,6 +231,12 @@ ACT.syncMove = async el => {
   rerender();
 };
 ACT.syncNow = async () => { await pull(); if (ls.get("dirty")) await push(); rerender(); };
+ACT.syncTakeRemote = async () => {
+  if (!await ask("Replace this device's copy?", "This device gets exactly the world that's on GitHub. What's on this device now is downloaded as a backup file first.", "Replace it", "danger")) return;
+  [...MODALS].forEach(m => m.close());
+  await takeRemote();
+  rerender();
+};
 ACT.syncOff = async () => { if (await ask("Stop syncing on this device?", "The world stays here and on GitHub; they just stop talking.", "Stop syncing", "")) { disconnectSync(); rerender(); } };
 
 ACT.exportWorld = async () => download(`${fileSlug(DB.world.name)}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await exportBundle()));

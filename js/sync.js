@@ -187,7 +187,8 @@ BACKENDS.repo = {
 async function applyRemote(remote) {
   const data = JSON.parse(remote.world);
   if (data.movedTo) return followMove(data.movedTo);
-  for (const [id, ref] of Object.entries(remote.files)) if (!hasAsset(id)) await assetPut(await backend().readAsset(ref), id);
+  const missed = await fetchAssets(remote);
+  if (missed) toast(`${plural(missed, "picture")} couldn't be downloaded yet; Moth tries again on the next sync.`, { ms: 7000 });
   SYNC.applying = true;
   DB = normalizeDB(data);
   save();
@@ -196,6 +197,16 @@ async function applyRemote(remote) {
   setKnown(Object.fromEntries(Object.entries(remote.files).map(([id, r]) => [id, r.path])));
   ls.set("dirty", "");
   rerender();
+}
+// the remote's pictures this device doesn't have yet; returns how many failed
+async function fetchAssets(remote) {
+  let missed = 0;
+  for (const [id, ref] of Object.entries(remote.files)) {
+    if (hasAsset(id)) continue;
+    try { await assetPut(await backend().readAsset(ref), id); }
+    catch (e) { console.warn("picture", id, e); missed++; }
+  }
+  return missed;
 }
 const remoteWorld = r => { try { return r.world ? JSON.parse(r.world) : null; } catch { return null; } };
 const isEmptyWorld = w => !w || !w.world;
@@ -210,7 +221,11 @@ async function pull({ quiet = false } = {}) {
     setSync("busy", "Checking for changes…");
     if (!await backend().ensure(false)) { SYNC.busy = false; return push(); }
     const v = await backend().head();
-    if (v && v === ls.get("version")) { SYNC.busy = false; return ls.get("dirty") ? push() : setSync("ok", "Up to date"); }
+    if (v && v === ls.get("version")) {
+      // pictures an earlier sync couldn't download
+      if ([...usedAssets()].some(a => !hasAsset(a) && knownFiles()[a])) await fetchAssets(await backend().read()).catch(e => console.warn(e));
+      SYNC.busy = false; return ls.get("dirty") ? push() : setSync("ok", "Up to date");
+    }
     const remote = await backend().read();
     const w = remoteWorld(remote);
     if (isEmptyWorld(w)) { SYNC.busy = false; ls.set("dirty", "1"); return push(); }
@@ -220,7 +235,24 @@ async function pull({ quiet = false } = {}) {
       if (!quiet) toast("Brought in changes from your other device");
       setSync("ok", "Up to date");
     } else { SYNC.busy = false; return conflict(remote); }
-  } catch (e) { console.warn(e); setSync("err", e.message); }
+  } catch (e) { console.warn(e); setSync("err", e.message); if (!quiet) toast("Sync: " + e.message, { ms: 7000 }); }
+  SYNC.busy = false;
+}
+
+// the way out of anything: this device takes exactly what's on GitHub
+async function takeRemote() {
+  if (SYNC.busy) return toast("Sync is busy; try again in a moment");
+  SYNC.busy = true;
+  setSync("busy", "Downloading the copy on GitHub…");
+  try {
+    const remote = await backend().read();
+    const w = remoteWorld(remote);
+    if (isEmptyWorld(w)) throw new Error("There's no world on GitHub yet");
+    try { download(fileSlug(DB.world.name) + "-this-device-backup.json", JSON.stringify(await exportBundle())); } catch (e) { console.warn(e); }
+    await applyRemote(remote);
+    setSync("ok", "Up to date");
+    toast("This device now has the copy from GitHub");
+  } catch (e) { console.warn(e); setSync("err", e.message); toast("Couldn't download it: " + e.message, { ms: 9000 }); }
   SYNC.busy = false;
 }
 
@@ -269,7 +301,7 @@ async function conflict(remote) {
   if (SYNC.resolving) return;
   if (blankHere()) {
     try { await applyRemote(remote); setSync("ok", "Up to date"); toast("Brought in your world from your other device"); }
-    catch (e) { console.warn(e); setSync("err", e.message); }
+    catch (e) { console.warn(e); setSync("err", e.message); toast("Couldn't bring in your world: " + e.message, { ms: 9000 }); }
     return;
   }
   SYNC.resolving = true;

@@ -18,5 +18,21 @@
   navigator.storage?.persist?.().catch(() => {});
   // clear out images nothing uses any more (deletes are past undoing by now)
   setTimeout(() => pruneAssets().catch(() => {}), 15000);
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("service-worker.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    // a home-screen app can stay open for days: look for a new version on
+    // every launch and every return to it, and switch to it straight away
+    // (once; not while something's being typed)
+    const hadOne = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" }).then(reg => {
+      reg.update().catch(() => {});
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadOne || reloaded) return;
+      reloaded = true;
+      const reload = () => { if (!/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName) && !MODALS.some(m => !/changed in two places/.test(m.el.textContent))) location.reload(); else setTimeout(reload, 2000); };
+      setTimeout(reload, 300);
+    });
+  }
 })();

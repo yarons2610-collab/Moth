@@ -3,12 +3,12 @@
 // The app's own files are fetched network-first, so a new version reaches an
 // installed phone on its next launch, and the cache is the offline fallback.
 // Bump the version when the file list changes.
-const CACHE = "moth-v11";
+const CACHE = "moth-v12";
 const SHELL = [
   "./", "index.html", "manifest.json", "css/moth.css", "vendor/fonts.css",
   "vendor/fonts/jetbrains-mono-latin.woff2", "vendor/fonts/space-grotesk-latin.woff2",
   "icons/moth.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png",
-  ...["core", "assets", "fields", "codex", "versions", "family", "timeline", "story", "map", "web", "play", "battle", "draw", "screen", "music", "notes", "find", "settings", "merge", "sync", "sample", "boot"].map(m => `js/${m}.js`),
+  ...["core", "assets", "fields", "codex", "versions", "family", "timeline", "story", "plot", "map", "web", "play", "battle", "draw", "screen", "music", "notes", "find", "settings", "merge", "sync", "sample", "boot"].map(m => `js/${m}.js`),
 ];
 
 self.addEventListener("install", e => {
@@ -22,7 +22,9 @@ self.addEventListener("fetch", e => {
   // only this app's own files; GitHub (sync) must always be live
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(req).then(res => {
+    // past the browser's own cache too, so a new version is never ten minutes late
+    // (a page load can't be re-made with options, so it's fetched by its address)
+    (req.mode === "navigate" ? fetch(req.url, { cache: "no-cache", credentials: "same-origin" }) : fetch(req, { cache: "no-cache" })).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match("index.html")))
