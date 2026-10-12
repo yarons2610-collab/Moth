@@ -233,21 +233,52 @@ function treeHtml(focus) {
     <svg class="tree-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${lines.join("")}</svg>${cards}</div></div>`;
 }
 
+// the separate families in the world: everyone joined by family ties, each
+// shown from the person whose tree takes in the most of them
+function families() {
+  return derived("families", () => {
+    const seen = new Set(), out = [];
+    for (const p of DB.entries) {
+      if (seen.has(p.id) || !hasFamily(p.id)) continue;
+      const members = [], stack = [p.id];
+      while (stack.length) {
+        const id = stack.pop();
+        if (seen.has(id)) continue;
+        seen.add(id); members.push(id);
+        for (const m of ["parents", "children", "spouses", "siblings"]) stack.push(...famGet(m, id));
+      }
+      const saved = { ...FAM };
+      Object.assign(FAM, { up: 2, down: 2 });
+      const root = members.map(id => [id, familyPeople(id).size]).sort((a, b) => b[1] - a[1] || byBirth(a[0], b[0]))[0][0];
+      Object.assign(FAM, saved);
+      // named after the surname most of them share, if they share one
+      const last = members.map(id => byId(DB.entries, id).name.trim().split(/\s+/)).filter(w => w.length > 1).map(w => w[w.length - 1]);
+      const top = Object.entries(last.reduce((o, w) => (o[w] = (o[w] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1])[0];
+      const name = top && top[1] >= 2 ? `The ${top[0]} family` : `${byId(DB.entries, root).name}'s family`;
+      out.push({ root, members, name });
+    }
+    return out.sort((a, b) => b.members.length - a.members.length || a.name.localeCompare(b.name));
+  });
+}
 addRoute("family", "web", id => {
-  const e = byId(DB.entries, id);
-  const people = DB.entries.filter(x => hasFamily(x.id)).sort((a, b) => a.name.localeCompare(b.name));
-  const tabs = webTabs("family");
+  const fams = families(), tabs = webTabs("family");
+  // no one chosen: the family you looked at last, or the biggest
+  const e = byId(DB.entries, id) || (byId(DB.entries, FAM.last) && hasFamily(FAM.last) ? byId(DB.entries, FAM.last) : fams[0] && byId(DB.entries, fams[0].root));
   if (!e) return `<div class="page">${tabs}<h2>Family trees</h2>
-    ${people.length ? `<p class="muted">Pick someone to centre the tree on.</p><div class="chips">${people.map(p => chip("e", p)).join("")}</div>`
-      : empty("No family ties yet. On a character's page, add a relationship like “daughter of” or use + Add family.")}</div>`;
+    ${empty("No family ties yet. Open a character in the Codex and use <b>+ Family</b> (or add a relationship like “daughter of”); their tree appears here.")}</div>`;
+  FAM.last = e.id;
+  const people = DB.entries.filter(x => hasFamily(x.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const mine = fams.find(f => f.members.includes(e.id));
+  const famRow = fams.length > 1 || !hasFamily(e.id) ? `<div class="chips-row fam-list">${fams.map(f => `<a class="fchip ${f === mine ? "on" : ""}" href="#/family/${f.root}">🌳 ${esc(f.name)} <small>${f.members.length}</small></a>`).join("")}</div>` : "";
   const sel = (name, v) => `<select data-change="famDepth" data-k="${name}">${[0, 1, 2, 3, 4].map(n => `<option ${n === v ? "selected" : ""}>${n}</option>`).join("")}</select>`;
   return [`<div class="page wide">${tabs}
-    <div class="page-h"><h2>Family of ${chip("e", e)}</h2><div class="spacer"></div>
+    ${famRow}
+    <div class="page-h"><h2>${mine ? esc(mine.name) + ": " : ""}centred on ${chip("e", e)}</h2><div class="spacer"></div>
       <label class="inline">Generations up ${sel("up", FAM.up)}</label><label class="inline">down ${sel("down", FAM.down)}</label>
       <select data-change="famJump"><option value="">Centre on…</option>${people.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>
     <div class="kin-bar">Add to ${esc(e.name)}:
       ${["parent", "spouse", "sibling", "child"].map(a => `<button class="btn small" data-act="addKin" data-id="${e.id}" data-as="${a}">+ ${a}</button>`).join("")}
-      <span class="muted">Tap anyone to centre the tree on them; tap ${esc(e.name)} again to open their page.</span></div>
+      <span class="muted">Tap anyone in the tree to centre it on them; tap ${esc(e.name)} (the highlighted card) to open their page.</span></div>
     <div class="tree-wrap">${treeHtml(e.id)}</div></div>`,
   main => {
     const wrap = $(".tree-wrap", main), f = $(".t-node.focus", main);
