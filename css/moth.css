@@ -795,3 +795,11 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
   .beats li select { grid-column: 2 / 4; }
   .arc-kvs .kv { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* a family's details, over its tree */
+.fam-info { border-left: 3px solid var(--c); padding: 4px 12px; margin: -4px 0 12px; }
+.fam-bits { color: var(--ink-dim); font-size: 13px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fam-info .prose { font-size: 14px; }
+.kin-edit { display: flex; flex-direction: column; gap: 8px; }
+.kin-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.kin-row select { width: auto; }

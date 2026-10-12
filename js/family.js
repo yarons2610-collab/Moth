@@ -37,7 +37,8 @@ ENTITY_PANELS.push(e => {
   if (!hasFamily(e.id)) return "";
   const row = (label, ids) => ids.length ? `<div class="kv"><span>${label}</span><div class="chips">${ids.sort(byBirth).map(id => chip("e", byId(DB.entries, id))).join("")}</div></div>` : "";
   const body = row("Parents", famGet("parents", e.id)) + row("Spouses", famGet("spouses", e.id)) + row("Siblings", siblingsOf(e.id)) + row("Children", famGet("children", e.id));
-  return `<section class="panel"><div class="panel-h"><h4>Family</h4>
+  const fam = families().find(f => f.members.includes(e.id));
+  return `<section class="panel"><div class="panel-h"><h4>Family${fam ? ` <small class="muted">🌳 ${esc(fam.name)}</small>` : ""}</h4>
     ${body ? `<a class="btn small" href="#/family/${e.id}">Family tree →</a>` : `<button class="btn small" data-act="addKin" data-id="${e.id}" data-as="parent">+ Add family</button>`}</div>
     ${body ? `<div class="kvs">${body}</div>` : ""}</section>`;
 });
@@ -233,6 +234,24 @@ function treeHtml(focus) {
     <svg class="tree-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${lines.join("")}</svg>${cards}</div></div>`;
 }
 
+/* a family's own details (DB.families): name, head, words, seat, a codex
+   entry it's tied to (a noble house, a clan…), colour and notes. Who is in
+   it always comes from the family ties; a record belongs to the family its
+   head is part of. */
+const famRecord = members => DB.families.find(r => members.includes(r.founder)) || null;
+linkType("fam", {
+  list: () => DB.families,
+  names: r => [r.name].filter(Boolean),
+  info: r => ({ title: r.name || "Family", sub: "Family", icon: "🌳", color: r.color || "#81b29a" }),
+  href: r => "#/family/" + r.founder,
+  text: r => [r.summary, r.words].join("\n"),
+  edges: r => [r.founder && ["e", r.founder, "head of the family"], r.seat && ["e", r.seat, "seat"], r.entry && ["e", r.entry, "the family"]].filter(Boolean),
+});
+ENTITY_DELETE_HOOKS.push(id => {
+  for (const r of DB.families) { if (r.seat === id) r.seat = ""; if (r.entry === id) r.entry = ""; }
+  DB.families = DB.families.filter(r => r.founder !== id);
+});
+
 // the separate families in the world: everyone joined by family ties, each
 // shown from the person whose tree takes in the most of them
 function families() {
@@ -254,8 +273,9 @@ function families() {
       // named after the surname most of them share, if they share one
       const last = members.map(id => byId(DB.entries, id).name.trim().split(/\s+/)).filter(w => w.length > 1).map(w => w[w.length - 1]);
       const top = Object.entries(last.reduce((o, w) => (o[w] = (o[w] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1])[0];
-      const name = top && top[1] >= 2 ? `The ${top[0]} family` : `${byId(DB.entries, root).name}'s family`;
-      out.push({ root, members, name });
+      const auto = top && top[1] >= 2 ? `The ${top[0]} family` : `${byId(DB.entries, root).name}'s family`;
+      const rec = famRecord(members);
+      out.push({ root: rec?.founder || root, members, name: rec?.name || auto, auto, rec });
     }
     return out.sort((a, b) => b.members.length - a.members.length || a.name.localeCompare(b.name));
   });
@@ -273,11 +293,14 @@ addRoute("family", "web", id => {
   const sel = (name, v) => `<select data-change="famDepth" data-k="${name}">${[0, 1, 2, 3, 4].map(n => `<option ${n === v ? "selected" : ""}>${n}</option>`).join("")}</select>`;
   return [`<div class="page wide">${tabs}
     ${famRow}
-    <div class="page-h"><h2>${mine ? esc(mine.name) + ": " : ""}centred on ${chip("e", e)}</h2><div class="spacer"></div>
+    <div class="page-h"><h2>${mine ? esc(mine.name) + ": " : ""}centred on ${chip("e", e)}</h2>
+      ${mine ? `<button class="btn small" data-act="editFamily" data-id="${e.id}">✎ Edit family</button>` : ""}<div class="spacer"></div>
       <label class="inline">Generations up ${sel("up", FAM.up)}</label><label class="inline">down ${sel("down", FAM.down)}</label>
       <select data-change="famJump"><option value="">Centre on…</option>${people.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>
+    ${mine?.rec ? famInfo(mine.rec) : ""}
     <div class="kin-bar">Add to ${esc(e.name)}:
       ${["parent", "spouse", "sibling", "child"].map(a => `<button class="btn small" data-act="addKin" data-id="${e.id}" data-as="${a}">+ ${a}</button>`).join("")}
+      ${hasFamily(e.id) ? `<button class="btn small" data-act="editKin" data-id="${e.id}">✎ Edit ${esc(e.name)}'s ties</button>` : ""}
       <span class="muted">Tap anyone in the tree to centre it on them; tap ${esc(e.name)} (the highlighted card) to open their page.</span></div>
     <div class="tree-wrap">${treeHtml(e.id)}</div></div>`,
   main => {
@@ -286,6 +309,77 @@ addRoute("family", "web", id => {
     wrap.addEventListener("click", ev => { const n = ev.target.closest(".t-node"); if (n) go(n.classList.contains("focus") ? "#/e/" + n.dataset.id : "#/family/" + n.dataset.id); });
   }];
 });
+function famInfo(r) {
+  const bits = [r.words && `<i>“${esc(r.words)}”</i>`, r.seat && byId(DB.entries, r.seat) && `Seat: ${chip("e", byId(DB.entries, r.seat))}`,
+    r.entry && byId(DB.entries, r.entry) && chip("e", byId(DB.entries, r.entry)), r.founder && `Head: ${chip("e", byId(DB.entries, r.founder))}`].filter(Boolean);
+  return `<div class="fam-info" style="--c:${r.color || "var(--accent)"}">${bits.length ? `<div class="fam-bits">${bits.join(" · ")}</div>` : ""}${r.summary ? `<div class="prose">${md(r.summary)}</div>` : ""}</div>`;
+}
+ACT.editFamily = el => {
+  const fam = families().find(f => f.members.includes(el.dataset.id));
+  if (!fam) return;
+  const r = fam.rec || { id: uid(), name: "", founder: fam.root, words: "", seat: "", entry: "", color: "", summary: "" };
+  const members = fam.members.map(id => byId(DB.entries, id)).sort((a, b) => a.name.localeCompare(b.name));
+  modal({ title: "Edit family", wide: true,
+    body: `${textField("Name", "name", r.name, `placeholder="${esc(fam.auto)}"`)}
+      <div class="row2">${field("Head of the family (the tree opens on them)", `<select name="founder">${members.map(m => `<option value="${m.id}" ${m.id === r.founder ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>`)}
+        ${textField("Words or motto", "words", r.words, `placeholder="e.g. What the sea takes, it keeps"`)}</div>
+      <div class="row2">${field("Seat", `<select name="seat">${entryOptions(r.seat, { blank: "—", kind: "place" })}</select>`)}
+        ${field("In the codex as", `<select name="entry">${entryOptions(r.entry, { blank: "— (a house, clan or dynasty entry) —" })}</select>`)}</div>
+      ${areaField("About the family ([[links]] work)", "summary", r.summary, 5, "data-links")}
+      ${colorField("Colour", "color", r.color)}
+      <p class="muted small">Who's in the family comes from their family ties: use ✎ Edit ties (or + parent, spouse…) on the tree to change it.</p>`,
+    buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
+      const v = formVals(w);
+      Object.assign(r, { name: v.name.trim(), founder: v.founder, words: v.words.trim(), seat: v.seat, entry: v.entry, summary: v.summary, color: v.color });
+      if (!DB.families.includes(r)) DB.families.push(r);
+      save();
+      go("#/family/" + r.founder);
+    } }] });
+};
+
+// a person's family ties, to change or remove one by one
+function kinOf(id) {
+  const out = [];
+  const add = (other, type, implied = false) => { if (!out.some(k => k.other === other)) out.push({ other, type, implied }); };
+  for (const p of famGet("parents", id)) add(p, "parent");
+  for (const c of famGet("children", id)) add(c, "child");
+  for (const s of famGet("spouses", id)) add(s, "spouse");
+  for (const s of famGet("siblings", id)) add(s, "sibling");
+  for (const s of siblingsOf(id)) add(s, "sibling", true);
+  return out;
+}
+// every family tie between two people, written on either of them
+const tiesBetween = (a, b) => [[a, b], [b, a]].flatMap(([x, y]) => (byId(DB.entries, x).rels || []).filter(r => r.to === y && relType(r)).map(r => ({ on: byId(DB.entries, x), r })));
+function setTie(id, other, type) {
+  for (const { on, r } of tiesBetween(id, other)) on.rels = on.rels.filter(x => x !== r);
+  const e = byId(DB.entries, id), o = byId(DB.entries, other);
+  const rel = (a, b, t, label) => (a.rels ||= []).push({ id: uid(), to: b.id, type: t, label });
+  if (type === "parent") rel(e, o, "child", "child of");
+  else if (type === "child") rel(o, e, "child", "child of");
+  else if (type === "spouse") rel(e, o, "spouse", "married to");
+  else if (type === "sibling") rel(e, o, "sibling", "sibling of");
+}
+const KIN_AS = { parent: "Parent", child: "Child", spouse: "Spouse", sibling: "Brother or sister" };
+ACT.editKin = el => {
+  const e = byId(DB.entries, el.dataset.id), kin = kinOf(e.id);
+  modal({ title: `${e.name}'s family ties`,
+    body: `<p class="muted">Change what each person is to ${esc(e.name)}, or remove the tie. (Other relationships between them stay.)</p>
+      <div class="kin-edit">${kin.map(k => { const o = byId(DB.entries, k.other); return `<div class="kin-row">
+        <span>${chip("e", o)}</span>
+        ${k.implied ? `<span class="muted small">a brother or sister through their parents</span>` : `<select name="k_${o.id}">${Object.entries(KIN_AS).map(([t, l]) => `<option value="${t}" ${t === k.type ? "selected" : ""}>${l}</option>`).join("")}<option value="">✕ Not family</option></select>`}</div>`; }).join("")}</div>`,
+    buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
+      const v = formVals(w), snap = JSON.stringify(DB);
+      let n = 0;
+      for (const k of kin) {
+        const key = "k_" + k.other;
+        if (k.implied || !(key in v) || v[key] === k.type) continue;
+        setTie(e.id, k.other, v[key]); n++;
+      }
+      if (!n) return;
+      commit();
+      toast(plural(n, "tie") + " changed", { undo: () => { DB = normalizeDB(JSON.parse(snap)); commit(); } });
+    } }] });
+};
 ACT.famDepth = el => { FAM[el.dataset.k] = +el.value; rerender(); };
 ACT.famJump = el => el.value && go("#/family/" + el.value);
 
