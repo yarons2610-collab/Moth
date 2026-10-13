@@ -127,7 +127,7 @@ addRoute("codex", "codex", kind => {
   ).sort(codexSorter(CODEX.sort));
   const counts = k => DB.entries.filter(e => e.kind === k).length;
   // groups: [heading html, entries]
-  let groups;
+  let groups, groupHint = "";
   const newBtn = k => `<button class="btn small ghost" data-act="newEntry" data-kind="${k.id}">+ ${esc(k.name)}</button>`;
   if (group === "kind") {
     // "All" is grouped by kind, in the kinds' own order, so it reads like a contents page
@@ -152,7 +152,8 @@ addRoute("codex", "codex", kind => {
     // a choice field's groups can be put in any order (it becomes the order of its choices)
     const shown = keys.filter(v => !v.startsWith("e:"));
     const mover = v => info.type !== "choice" || shown.length < 2 ? "" : `<span class="group-move">
-      <button class="mini" data-act="groupMove" data-f="${esc(n)}" data-v="${esc(v)}" data-d="-1" title="Move this group up" ${shown[0] === v ? "disabled" : ""}>↑</button><button class="mini" data-act="groupMove" data-f="${esc(n)}" data-v="${esc(v)}" data-d="1" title="Move this group down" ${shown[shown.length - 1] === v ? "disabled" : ""}>↓</button></span>`;
+      <button class="btn small" data-act="groupMove" data-f="${esc(n)}" data-v="${esc(v)}" data-d="-1" title="Move this group up" aria-label="Move ${esc(v)} up" ${shown[0] === v ? "disabled" : ""}>↑</button><button class="btn small" data-act="groupMove" data-f="${esc(n)}" data-v="${esc(v)}" data-d="1" title="Move this group down" aria-label="Move ${esc(v)} down" ${shown[shown.length - 1] === v ? "disabled" : ""}>↓</button></span>`;
+    groupHint = info.type === "choice" && shown.length > 1 ? `<p class="muted small group-hint">Use ↑ ↓ beside each ${esc(info.name.toLowerCase())} to put the groups in your own order.</p>` : "";
     groups = keys.map(v => {
       if (!v.startsWith("e:")) return [esc(v), vals.get(v), null, mover(v)];
       const to = byId(DB.entries, v.slice(2));
@@ -178,6 +179,7 @@ addRoute("codex", "codex", kind => {
         ${groupFields.length ? `<optgroup label="A field">${groupFields.map(([n, f]) => opt("f:" + n, f.name, group)).join("")}</optgroup>` : ""}</select></label>
       <span class="muted">${plural(list.length, "entry")}</span>
     </div>
+    ${groupHint}
     ${list.length ? groups.map(([h, l, c, extra]) => `${h ? `<h3 class="codex-group" style="--c:${c || "var(--ink)"}"><span>${h}</span> <small>${l.length}</small>${extra || ""}</h3>` : ""}
       <div class="cards">${l.map(entryCard).join("")}</div>`).join("")
       : empty(DB.entries.length ? "Nothing matches." : "The codex is empty. Add a first character, place or legend.")}

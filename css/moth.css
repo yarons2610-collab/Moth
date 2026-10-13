@@ -803,5 +803,7 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .kin-edit { display: flex; flex-direction: column; gap: 8px; }
 .kin-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .kin-row select { width: auto; }
-.group-move { display: inline-flex; gap: 2px; margin-left: 4px; }
-.group-move .mini:disabled { opacity: .25; }
+.group-move { display: inline-flex; gap: 4px; margin-left: auto; }
+.codex-group .group-move .btn { margin-left: 0; min-width: 34px; padding: 3px 8px; font-size: 15px; line-height: 1; }
+.group-move .btn:disabled { opacity: .3; }
+.group-hint { margin: 2px 0 8px; }
