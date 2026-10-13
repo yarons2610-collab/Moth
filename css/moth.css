@@ -803,3 +803,5 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .kin-edit { display: flex; flex-direction: column; gap: 8px; }
 .kin-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .kin-row select { width: auto; }
+.group-move { display: inline-flex; gap: 2px; margin-left: 4px; }
+.group-move .mini:disabled { opacity: .25; }

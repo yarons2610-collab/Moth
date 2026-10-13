@@ -149,8 +149,12 @@ addRoute("codex", "codex", kind => {
       const na = a.startsWith("e:") ? byId(DB.entries, a.slice(2)).name : a, nb = b.startsWith("e:") ? byId(DB.entries, b.slice(2)).name : b;
       return na.localeCompare(nb);
     });
+    // a choice field's groups can be put in any order (it becomes the order of its choices)
+    const shown = keys.filter(v => !v.startsWith("e:"));
+    const mover = v => info.type !== "choice" || shown.length < 2 ? "" : `<span class="group-move">
+      <button class="mini" data-act="groupMove" data-f="${esc(n)}" data-v="${esc(v)}" data-d="-1" title="Move this group up" ${shown[0] === v ? "disabled" : ""}>↑</button><button class="mini" data-act="groupMove" data-f="${esc(n)}" data-v="${esc(v)}" data-d="1" title="Move this group down" ${shown[shown.length - 1] === v ? "disabled" : ""}>↓</button></span>`;
     groups = keys.map(v => {
-      if (!v.startsWith("e:")) return [esc(v), vals.get(v)];
+      if (!v.startsWith("e:")) return [esc(v), vals.get(v), null, mover(v)];
       const to = byId(DB.entries, v.slice(2));
       return [`<a href="#/e/${to.id}">${kindOf(to).icon} ${esc(to.name)}</a>`, vals.get(v), entryColor(to)];
     }).concat([[`No ${esc(info.name.toLowerCase())}`, list.filter(e => !groupVals(e, n).length)]]);
@@ -179,6 +183,21 @@ addRoute("codex", "codex", kind => {
       : empty(DB.entries.length ? "Nothing matches." : "The codex is empty. Add a first character, place or legend.")}
   </div>`;
 });
+// move a group up or down: the field's choices take the new order, in every
+// kind in view that has the field (values in use that weren't choices become ones)
+ACT.groupMove = el => {
+  const n = el.dataset.f, v = el.dataset.v, d = +el.dataset.d;
+  const kinds = (CODEX.kind ? DB.kinds.filter(k => k.id === CODEX.kind) : DB.kinds);
+  const fields = kinds.flatMap(k => k.fields.filter(f => f.type === "choice" && norm(f.name) === n));
+  const used = [...new Set(DB.entries.filter(e => kinds.some(k => k.id === e.kind)).flatMap(e => groupVals(e, n)))];
+  const order = [...new Set([...fields.flatMap(f => f.opts || []), ...used.sort((a, b) => a.localeCompare(b))])];
+  const present = order.filter(x => used.includes(x)), i = present.indexOf(v), to = present[i + d];
+  if (i < 0 || !to) return;
+  order.splice(order.indexOf(v), 1);
+  order.splice(order.indexOf(to) + (d > 0 ? 1 : 0), 0, v);
+  for (const f of fields) f.opts = order.slice();
+  commit();
+};
 ACT.codexSort = el => { CODEX.sort = el.value; keepCodexView(); rerender(); };
 ACT.codexGroup = el => { CODEX.group = el.value; keepCodexView(); rerender(); };
 function entryCard(e) {

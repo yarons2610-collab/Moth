@@ -24,7 +24,7 @@ const KIND_TEMPLATES = {
     ["Personality", "Fears", "text"], ["Personality", "Mannerisms", "text"], ["Personality", "Voice and speech", "text"], ["Personality", "Quotes", "list"],
     ["Background", "Upbringing", "long"], ["Background", "Education and training", "text"], ["Background", "Turning points", "long"],
     ["Abilities", "Skills", "list"], ["Abilities", "Talents and magic", "long"], ["Abilities", "Weaknesses", "text"], ["Abilities", "Possessions", "links"],
-    ["In the story", "Role", "choice", "Protagonist|Antagonist|Deuteragonist|Mentor|Ally|Love interest|Foil|Rival|Supporting|Minor"],
+    ["In the story", "Role", "choice", "Protagonist|Deuteragonist|Antagonist|Love interest|Mentor|Rival|Foil|Ally|Supporting|Minor|Background"],
     ["In the story", "Wants", "long"], ["In the story", "Needs", "long"], ["In the story", "Arc", "long"], ["In the story", "Theme", "text"],
     ["Secrets", "Secrets", "long!"], ["Secrets", "What they'd never admit", "long!"],
   ],
