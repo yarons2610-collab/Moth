@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-13b";
+const APP_VERSION = "2026-10-16";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -304,15 +304,22 @@ function modal({ title, body, wide = false, buttons = [], onOpen, onClose, cls =
     ${buttons.length ? `<div class="modal-f">${buttons.map((b, i) => `<button class="btn ${b.cls || ""}" data-mb="${i}">${esc(b.label)}</button>`).join("")}</div>` : ""}
   </div>`;
   document.body.append(wrap);
+  // Closing with × or Escape after typing something asks first. Clicking
+  // outside the window never closes it: too easy to do by accident.
+  let edited = false;
   const api = {
     el: wrap,
     close() { if (!wrap.isConnected) return; wrap.remove(); MODALS.splice(MODALS.indexOf(api), 1); acClose(); onClose?.(); },
+    async dismiss() {
+      if (edited && buttons.length && !await ask("Throw away your changes?", "What you've typed or chosen in this window isn't saved yet.", "Throw them away", "danger", "Keep editing")) return;
+      api.close();
+    },
   };
   MODALS.push(api);
-  let downOnBackdrop = false;
-  wrap.addEventListener("mousedown", e => { downOnBackdrop = e.target === wrap; });
+  wrap.addEventListener("input", () => { edited = true; });
+  wrap.addEventListener("change", () => { edited = true; });
   wrap.addEventListener("click", e => {
-    if ((e.target === wrap && downOnBackdrop) || e.target.closest("[data-close]")) return api.close();
+    if (e.target.closest("[data-close]")) return api.dismiss();
     const b = e.target.closest("[data-mb]");
     if (b) { const r = buttons[+b.dataset.mb].act?.(wrap, api); if (r !== false) api.close(); }
   });
@@ -327,12 +334,12 @@ function modal({ title, body, wide = false, buttons = [], onOpen, onClose, cls =
   return api;
 }
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && MODALS.length) { e.preventDefault(); MODALS[MODALS.length - 1].close(); }
+  if (e.key === "Escape" && MODALS.length) { e.preventDefault(); MODALS[MODALS.length - 1].dismiss(); }
 });
-function ask(title, msg, label = "Delete", cls = "danger") {
+function ask(title, msg, label = "Delete", cls = "danger", cancel = "Cancel") {
   return new Promise(res => {
     let ok = false;
-    modal({ title, body: `<p>${msg}</p>`, buttons: [{ label: "Cancel" }, { label, cls, act: () => { ok = true; } }], onClose: () => res(ok) });
+    modal({ title, body: `<p>${msg}</p>`, buttons: [{ label: cancel }, { label, cls, act: () => { ok = true; } }], onClose: () => res(ok) });
   });
 }
 function formVals(root) {
