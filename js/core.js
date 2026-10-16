@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-16c";
+const APP_VERSION = "2026-10-17";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -98,7 +98,13 @@ function withUndo(label, fn) {
 function eras() { return [...DB.world.eras].sort((a, b) => a.start - b.start); }
 function eraOf(y) { const es = eras(); let e = es[0]; for (const x of es) if (x.start <= y) e = x; return e; }
 function monthName(m) { return DB.world.months[m - 1] || "Month " + m; }
-function fmtYear(y) { const e = eraOf(y); const n = y - e.start + 1; return n + (e.abbr ? " " + e.abbr : ""); }
+// An era that counts down (like BC) numbers its years backwards from the
+// era after it: the year just before that era begins is its year 1.
+function eraNext(e) { const es = eras(); return es[es.indexOf(e) + 1] || null; }
+const countsDown = e => !!e.down && !!eraNext(e);
+function yearIn(e, y) { return countsDown(e) ? eraNext(e).start - y : y - e.start + 1; }
+function yearFrom(e, n) { return countsDown(e) ? eraNext(e).start - n : e.start + n - 1; }
+function fmtYear(y) { const e = eraOf(y); const n = yearIn(e, y); return n + (e.abbr ? " " + e.abbr : ""); }
 function fmtDate(dt) {
   if (!dt || dt.y == null || isNaN(dt.y)) return "";
   return (dt.d ? dt.d + " " : "") + (dt.m ? monthName(dt.m) + " " : "") + fmtYear(dt.y);
@@ -132,7 +138,7 @@ function parseDate(str) {
   else if (nums.length === 1) m = nums[0];
   else if (nums.length >= 2) { m = nums.pop(); d = nums.pop(); }
   if (nums.length) return null;
-  const out = { y: era.start + y - 1 };
+  const out = { y: yearFrom(era, y) };
   if (m) out.m = m;
   if (d && m) out.d = d;
   return out;

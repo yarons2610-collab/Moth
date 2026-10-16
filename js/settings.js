@@ -13,7 +13,7 @@ addRoute("settings", "", () => {
 
     <section class="panel"><div class="panel-h"><h4>Calendar</h4><button class="btn small" data-act="editCalendar">Edit</button></div>
       <p class="muted">Dates are written the world's way, e.g. <b>${esc(fmtDate({ y: NOW().y, m: w.months.length ? 1 : undefined, d: w.months.length ? 1 : undefined }))}</b>.</p>
-      <div class="kvs"><div class="kv"><span>Eras</span><div>${eras().map(e => `${esc(e.name)}${e.abbr ? ` (${esc(e.abbr)})` : ""} <small class="muted">from year ${e.start}</small>`).join("<br>")}</div></div>
+      <div class="kvs"><div class="kv"><span>Eras</span><div>${eras().map(e => `${esc(e.name)}${e.abbr ? ` (${esc(e.abbr)})` : ""} <small class="muted">${countsDown(e) ? `counts down to ${esc(eraNext(e).name)}` : `from year ${e.start}`}</small>`).join("<br>")}</div></div>
         <div class="kv"><span>Months</span><div>${w.months.length ? w.months.map(esc).join(", ") : `<span class="muted">None: dates are years only, or month numbers</span>`}</div></div></div></section>
 
     <section class="panel"><div class="panel-h"><h4>Kinds of entry</h4><button class="btn small" data-act="editKind" data-id="">+ Kind</button></div>
@@ -98,18 +98,48 @@ const syncLabel = () => ({ off: "Off", ok: "Up to date", busy: "Syncing…", pen
 on("syncState", () => { if (CUR.prefix === "settings") { const s = $(".sync-state"); if (s) { s.className = "sync-state " + SYNC.state; s.textContent = syncLabel(); } } });
 
 ACT.setWorldName = el => { DB.world.name = el.value.trim() || "Untitled world"; commit(); };
+// one era per line: name | abbreviation | first year | "counts down" (like BC)
+const DOWN_RE = /^(counts? ?down|down|back(wards?)?|↓|reverse|bc)$/i;
 ACT.editCalendar = () => modal({ title: "Calendar", wide: true,
-  body: `<p class="muted">One era per line: <b>name | abbreviation | first year</b>. Years are counted from 1 across the whole history; each era starts at one of those years, and dates show the year within their era.</p>
-    ${areaField("Eras", "eras", eras().map(e => `${e.name} | ${e.abbr || ""} | ${e.start}`).join("\n"), 4)}
+  body: `<p class="muted">One era per line: <b>name | abbreviation | first year</b>, and <b>| counts down</b> for an era whose years count backwards toward the next one, like BC: its year 1 is the year just before the next era begins.
+      Years are one long count across all of history; eras only change how they're written, so you can change them at any time without moving anything.</p>
+    <div class="btn-row"><button type="button" class="btn small" data-act="calPreset" data-k="bcad">Use BC / AD style</button><button type="button" class="btn small ghost" data-act="calPreset" data-k="ages">Use ages counting forward</button></div>
+    ${areaField("Eras", "eras", eras().map(e => [e.name, e.abbr || "", e.start, e.down ? "counts down" : ""].filter((x, i) => i < 3 || x).join(" | ")).join("\n"), 4)}
+    <div class="muted small" id="calPreview"></div>
     ${areaField("Month names, in order, separated by commas (leave empty for none)", "months", DB.world.months.join(", "), 3)}`,
+  onOpen: w => { const t = $("[name=eras]", w); t.dataset.input = "calPreview"; ACT.calPreview(t); },
   buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
-    const v = formVals(w), old = eras();
-    const es = v.eras.split("\n").map(l => l.split("|").map(s => s.trim())).filter(p => p[0]).map((p, i) => ({ id: old[i]?.id || uid(), name: p[0], abbr: p[1] || "", start: parseInt(p[2]) || 1 }));
+    const v = formVals(w), es = readEras(v.eras);
     if (!es.length) { toast("Keep at least one era"); return false; }
     DB.world.eras = es;
     DB.world.months = splitList(v.months);
     commit();
   } }] });
+function readEras(text) {
+  const old = eras();
+  return text.split("\n").map(l => l.split("|").map(s => s.trim())).filter(p => p[0])
+    .map((p, i) => ({ id: old[i]?.id || uid(), name: p[0], abbr: p[1] || "", start: parseInt(p[2]) || 1, ...(DOWN_RE.test(p[3] || "") ? { down: true } : {}) }));
+}
+// what the eras would make of a few years, as they're typed
+ACT.calPreview = el => {
+  const box = $("#calPreview"); if (!box) return;
+  const es = readEras(el.value);
+  if (!es.length) return box.textContent = "";
+  const saved = DB.world.eras; DB.world.eras = es;
+  try {
+    const sorted = eras(), bound = sorted.find(e => e.down && eraNext(e)) ? eraNext(sorted.find(e => e.down && eraNext(e))).start : sorted[sorted.length - 1].start;
+    const ys = [...new Set([bound - 100, bound - 2, bound - 1, bound, bound + 1, bound + 99])];
+    box.innerHTML = "For example: " + ys.map(y => `<b>${esc(fmtYear(y))}</b>`).join(" → ") + " (oldest to newest)";
+  } finally { DB.world.eras = saved; }
+};
+ACT.calPreset = el => {
+  const t = $(".modal [name=eras]");
+  t.value = el.dataset.k === "bcad"
+    ? "Before the Crowning | BC | -100000 | counts down\nAfter the Crowning | AC | 1"
+    : "First Age | FA | 1\nSecond Age | SA | 1000";
+  t.dispatchEvent(new Event("input", { bubbles: true }));
+  toast("Rename them to suit your world, then Save");
+};
 
 /* ── picking an icon ── emoji worth having in a fantasy world, each with the
    words it can be found by */
