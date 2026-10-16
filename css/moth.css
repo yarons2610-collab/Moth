@@ -571,10 +571,11 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .extra-row { display: grid; grid-template-columns: 160px 1fr auto; gap: 6px; width: 100%; align-items: start; }
 .kf-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
 .kf-card { border: 1px solid var(--line2); border-radius: 12px; background: var(--panel); padding: 10px 12px 8px; }
-.kf-card.basics { background: color-mix(in srgb, var(--accent) 5%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 30%, var(--line2)); }
+.kf-card.side { background: color-mix(in srgb, var(--accent) 5%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 35%, var(--line2)); }
+.kf-side { flex: none; border: 1px solid var(--line2); background: transparent; color: var(--ink-faint); border-radius: 999px; padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+.kf-side.on { color: var(--ink); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .kf-card-h { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.kf-card-h h5 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
-.kf-card-h h5 small { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 6px; }
+.kf-card-h { flex-wrap: wrap; }
 .kf-sec-name { flex: 1; font: 600 13px var(--disp); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); background: transparent; border-color: transparent; padding: 4px 6px; }
 .kf-sec-name:hover, .kf-sec-name:focus { border-color: var(--line2); background: var(--bg2); }
 .kf-fields { display: flex; flex-direction: column; gap: 6px; min-height: 8px; }

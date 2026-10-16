@@ -147,9 +147,10 @@ ACT.emojiSearch = el => {
   for (const g of $$(".emoji-group", box)) g.hidden = !$$(".emoji", g).some(b => !b.hidden);
 };
 
-/* ── the field editor ── laid out the way an entry's page is: the basics
-   (the box beside the article) first, then each section as its own card,
-   its fields inside it, in the order the page shows them. */
+/* ── the field editor ── laid out the way an entry's page is: each section
+   as its own card, its fields inside it, in the order the page shows them.
+   Any section can go first, and 📌 picks the one (or none) shown in the box
+   beside the article (kind.side). */
 function kfRow(f) {
   return `<div class="kf-row" data-id="${f.id || ""}">
     <input class="kf-name" value="${esc(f.name || "")}" placeholder="Field name" aria-label="Field name">
@@ -161,30 +162,37 @@ function kfRow(f) {
     <input class="kf-opts" value="${esc((f.opts || []).join(", "))}" placeholder="The choices, with commas between them" aria-label="Choices" ${f.type === "choice" ? "" : "hidden"}>
   </div>`;
 }
-function kfSection(sec, fields) {
-  const basics = sec === null;
-  return `<section class="kf-card ${basics ? "basics" : ""}">
-    <div class="kf-card-h">${basics ? `<h5>Basics <small class="muted">in the box beside the article</small></h5>`
-      : `<input class="kf-sec-name" value="${esc(sec)}" placeholder="Section name" data-input="kfSecName" aria-label="Section name">
-        <span class="kf-tools"><button type="button" class="mini" data-act="kfSecMove" data-d="-1" title="Move the section up">↑</button><button type="button" class="mini" data-act="kfSecMove" data-d="1" title="Move the section down">↓</button><button type="button" class="mini" data-act="kfSecDel" title="Remove the section (its fields go to Basics)">✕</button></span>`}</div>
+function kfSection(sec, fields, side = false) {
+  return `<section class="kf-card ${side ? "side" : ""}">
+    <div class="kf-card-h">
+      <input class="kf-sec-name" value="${esc(sec)}" placeholder="Section name (blank: “Details”)" data-input="kfSecName" aria-label="Section name">
+      <button type="button" class="kf-side ${side ? "on" : ""}" data-act="kfSide" title="Show this section in the box beside the article (tap again for none)">${side ? "📌 Beside the article" : "📌 Put beside the article"}</button>
+      <span class="kf-tools"><button type="button" class="mini" data-act="kfSecMove" data-d="-1" title="Move the section up">↑</button><button type="button" class="mini" data-act="kfSecMove" data-d="1" title="Move the section down">↓</button><button type="button" class="mini" data-act="kfSecDel" title="Remove the section (its fields join the one above)">✕</button></span></div>
     <div class="kf-fields">${fields.map(kfRow).join("")}</div>
-    <button type="button" class="btn small ghost kf-add" data-act="kfAdd">+ Field${basics ? "" : " in this section"}</button>
+    <button type="button" class="btn small ghost kf-add" data-act="kfAdd">+ Field in this section</button>
   </section>`;
 }
-function kfCards(fields) {
-  const secs = fieldSections(fields); // [["", basics], [name, fields]…]
-  const basics = secs.find(([n]) => !n)?.[1] || [];
-  return kfSection(null, basics) + secs.filter(([n]) => n).map(([n, fs]) => kfSection(n, fs)).join("");
+function kfCards(fields, side) {
+  const secs = fieldSections(fields);
+  if (!secs.length) secs.push(["", []]);
+  return secs.map(([n, fs]) => kfSection(n, fs, side === n)).join("");
 }
 // the "move to" lists name every section there is right now
 function kfRefresh(root = $("#kfList")) {
   if (!root) return;
-  const names = $$(".kf-card", root).map(c => c.classList.contains("basics") ? "" : $(".kf-sec-name", c).value.trim());
-  $$(".kf-card", root).forEach((c, ci) => {
-    for (const sel of $$(".kf-move", c)) sel.innerHTML = `<option value="">⇄ Move to…</option>` + names.map((n, i) => i === ci ? "" : `<option value="${i}">${esc(n || (i ? "(unnamed section)" : "Basics"))}</option>`).join("") + `<option value="new">A new section…</option>`;
-    $$(".kf-tools [data-act=kfSecMove]", c).forEach(b => { b.disabled = b.dataset.d < 0 ? ci <= 1 : ci === names.length - 1; });
+  const cards = $$(".kf-card", root), names = cards.map(c => $(".kf-sec-name", c).value.trim());
+  cards.forEach((c, ci) => {
+    for (const sel of $$(".kf-move", c)) sel.innerHTML = `<option value="">⇄ Move to…</option>` + names.map((n, i) => i === ci ? "" : `<option value="${i}">${esc(n || "Details (no name)")}</option>`).join("") + `<option value="new">A new section…</option>`;
+    $$(".kf-card-h [data-act=kfSecMove]", c).forEach(b => { b.disabled = b.dataset.d < 0 ? ci === 0 : ci === cards.length - 1; });
+    $(".kf-card-h [data-act=kfSecDel]", c).disabled = cards.length < 2;
   });
 }
+ACT.kfSide = el => {
+  const card = el.closest(".kf-card"), on = !card.classList.contains("side");
+  for (const c of $$("#kfList .kf-card")) { c.classList.remove("side"); const b = $(".kf-side", c); b.classList.remove("on"); b.textContent = "📌 Put beside the article"; }
+  if (on) { card.classList.add("side"); el.classList.add("on"); el.textContent = "📌 Beside the article"; }
+  card.closest(".modal-wrap")?.dispatchEvent(new Event("change", { bubbles: true }));
+};
 ACT.kfType = el => { el.closest(".kf-row").querySelector(".kf-opts").hidden = el.value !== "choice"; };
 ACT.kfSecret = el => el.closest(".kf-secret").classList.toggle("on", el.checked);
 ACT.kfMove = el => { const r = el.closest(".kf-row"), d = +el.dataset.d; d < 0 ? r.previousElementSibling?.before(r) : r.nextElementSibling?.after(r); };
@@ -193,12 +201,14 @@ ACT.kfAdd = el => { const list = $(".kf-fields", el.closest(".kf-card")); list.i
 ACT.kfSecName = () => kfRefresh();
 ACT.kfSecMove = el => {
   const c = el.closest(".kf-card"), d = +el.dataset.d;
-  if (d < 0) { const p = c.previousElementSibling; if (p && !p.classList.contains("basics")) p.before(c); } else c.nextElementSibling?.after(c);
+  d < 0 ? c.previousElementSibling?.before(c) : c.nextElementSibling?.after(c);
   kfRefresh();
 };
 ACT.kfSecDel = el => {
-  const c = el.closest(".kf-card");
-  $(".kf-fields", $("#kfList .kf-card.basics")).append(...$$(".kf-row", c));
+  const c = el.closest(".kf-card"), to = c.previousElementSibling || c.nextElementSibling;
+  if (!to) return;
+  $(".kf-fields", to).append(...$$(".kf-row", c));
+  if (c.classList.contains("side")) $(".kf-side", to).click();
   c.remove(); kfRefresh();
 };
 ACT.kfAddSection = () => {
@@ -222,7 +232,7 @@ ACT.kfSuggest = el => {
   const add = templateFields(el.dataset.id).filter(f => !have.has(norm(f.name))).map(f => ({ ...f, id: gone.get(norm(f.name)) || "" }));
   // each into its own section, made if it isn't there yet
   for (const f of add) {
-    let card = f.sec ? $$("#kfList .kf-card:not(.basics)").find(c => norm($(".kf-sec-name", c).value) === norm(f.sec)) : $("#kfList .kf-card.basics");
+    let card = $$("#kfList .kf-card").find(c => norm($(".kf-sec-name", c).value) === norm(f.sec || ""));
     if (!card) { $("#kfList").insertAdjacentHTML("beforeend", kfSection(f.sec, [])); card = $$("#kfList .kf-card").pop(); }
     $(".kf-fields", card).insertAdjacentHTML("beforeend", kfRow(f));
   }
@@ -237,8 +247,8 @@ ACT.editKind = el => {
     body: `<div class="row3">${textField("Name", "name", k.name, "autofocus")}${field("Icon", emojiPicker(k.icon))}${field("Colour", `<input type="color" name="color" value="${k.color}">`)}</div>
       <div class="row2">${textField("Start date is called", "startLabel", k.startLabel)}${textField("End date is called", "endLabel", k.endLabel)}</div>
       <h4 class="screen-h">Fields</h4>
-      <p class="muted small">Laid out as on an entry's page: the basics in the box beside the article, then each section in order. 🙈 Secret fields are only for you and never go on the player screen. Empty fields don't show on an entry's page.</p>
-      <div class="kf-list" id="kfList">${kfCards(k.fields)}</div>
+      <p class="muted small">Laid out as on an entry's page, in order. 📌 marks the section shown in the box beside the article (tap it on another section to move it there, or tap it again for none). 🙈 Secret fields are only for you and never go on the player screen. Empty fields don't show on an entry's page.</p>
+      <div class="kf-list" id="kfList">${kfCards(k.fields, sideSection(k))}</div>
       <div class="btn-row"><button type="button" class="btn small" data-act="kfAddSection">+ Section</button>
         ${KIND_TEMPLATES[k.id] ? `<button type="button" class="btn small" data-act="kfSuggest" data-id="${k.id}">Add the suggested fields</button>` : ""}</div>
       ${!isNew ? `<p class="muted small">${plural(used, "entry")} of this kind. Renaming a field keeps what's in it; removing one hides it (put it back with the same name to see it again).</p>` : ""}`,
@@ -258,7 +268,7 @@ ACT.editKind = el => {
         k.fields = $$(".kf-row", w).map(r => {
           const name = $(".kf-name", r).value.trim(), type = $(".kf-type", r).value;
           if (!name) return null;
-          const card = r.closest(".kf-card"), sec = card.classList.contains("basics") ? "" : $(".kf-sec-name", card).value.trim();
+          const sec = $(".kf-sec-name", r.closest(".kf-card")).value.trim();
           const f = { id: r.dataset.id || byName.get(norm(name)) || uid(), name, type, sec };
           if (type === "choice") f.opts = splitList($(".kf-opts", r).value);
           if ($(".kf-secret input", r).checked) f.secret = true;
@@ -267,6 +277,8 @@ ACT.editKind = el => {
         const kept = new Set(k.fields.map(f => f.id));
         const gone = [...(k.gone || []), ...before.filter(f => !kept.has(f.id)).map(f => ({ id: f.id, name: f.name }))];
         k.gone = [...new Map(gone.filter(f => !kept.has(f.id)).map(f => [norm(f.name), f])).values()];
+        const sideCard = $(".kf-card.side", w);
+        k.side = sideCard ? $(".kf-sec-name", sideCard).value.trim() : null;
         Object.assign(k, { name: v.name.trim(), icon: v.icon.trim() || "◆", color: v.color, startLabel: v.startLabel.trim() || "From", endLabel: v.endLabel.trim() || "Until" });
         if (isNew) { k.id = fileSlug(k.name) + "-" + uid().slice(0, 4); DB.kinds.push(k); }
         commit();

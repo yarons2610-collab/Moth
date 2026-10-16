@@ -148,12 +148,15 @@ function upgradeKinds(db) {
   db.fieldsV = 4;
 }
 
-// sections in order: the untitled one ("Basics") first, then as they come
+// sections in the order their first field comes (the unnamed one too)
 function fieldSections(fields) {
-  const secs = new Map([["", []]]);
+  const secs = new Map();
   for (const f of fields) { const s = f.sec || ""; if (!secs.has(s)) secs.set(s, []); secs.get(s).push(f); }
   return [...secs].filter(([, fs]) => fs.length);
 }
+// the section shown in the box beside the article: the unnamed one unless
+// the kind says otherwise (null: none, everything goes below the article)
+const sideSection = k => k?.side === undefined ? "" : k.side;
 const isEmptyVal = v => v == null || v === "" || (Array.isArray(v) && !v.length) || v === false;
 const SHORT = new Set(["text", "number", "date", "choice", "yesno", "link"]);
 

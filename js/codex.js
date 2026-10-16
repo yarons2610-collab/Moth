@@ -220,17 +220,18 @@ addRoute("e", "codex", id => {
   const e = byId(DB.entries, id);
   if (!e) return `<div class="page">${empty("That entry doesn't exist any more.")}</div>`;
   const k = kindOf(e);
-  // the untitled section (the basics) goes beside the article, the rest below it
+  // one section (the kind chooses which; the unnamed one unless it says) goes
+  // beside the article, the rest below it in their order
   const filled = f => !isEmptyVal(e.fields?.[f.id]);
   const kv = f => `<div class="kv ${f.secret ? "secret-field" : ""}"><span>${f.secret ? "🙈 " : ""}${esc(f.name)}</span><div>${fieldShow(f, e.fields[f.id])}</div></div>`;
-  const secs = fieldSections(k.fields);
-  const basics = (secs.find(([s]) => s === "")?.[1] || []).filter(filled);
+  const secs = fieldSections(k.fields), side = sideSection(k);
+  const basics = side === null ? [] : (secs.find(([s]) => s === side)?.[1] || []).filter(filled);
   const emptyCount = k.fields.filter(f => !filled(f)).length;
-  const sections = secs.filter(([s]) => s).map(([s, fs]) => {
+  const sections = secs.filter(([s]) => s !== side).map(([s, fs]) => {
     const got = fs.filter(filled);
     if (!got.length) return "";
     const short = got.filter(f => SHORT.has(f.type)), long = got.filter(f => !SHORT.has(f.type));
-    return `<section class="panel field-sec"><div class="panel-h"><h4>${esc(s)}</h4></div>
+    return `<section class="panel field-sec"><div class="panel-h"><h4>${esc(s || "Details")}</h4></div>
       ${short.length ? `<div class="kvs grid2">${short.map(kv).join("")}</div>` : ""}
       ${long.map(f => `<div class="field-block ${f.secret ? "secret-field" : ""}"><h5>${f.secret ? "🙈 " : ""}${esc(f.name)}</h5>${fieldShow(f, e.fields[f.id])}</div>`).join("")}</section>`;
   }).join("") + ((e.extra || []).length ? `<section class="panel field-sec"><div class="panel-h"><h4>More</h4></div>
