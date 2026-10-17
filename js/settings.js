@@ -11,7 +11,7 @@ addRoute("settings", "", () => {
       ${textField("Name", "worldName", w.name, `data-change="setWorldName"`)}
       <div class="kv"><span>Now</span><div>${esc(fmtDate(NOW()))} <button class="btn small" data-act="setNow">Change</button></div></div></section>
 
-    <section class="panel"><div class="panel-h"><h4>Calendar</h4><button class="btn small" data-act="editCalendar">Edit</button></div>
+    <section class="panel"><div class="panel-h"><h4>Calendar</h4><button class="btn small" data-act="shiftDates">Shift dates…</button><button class="btn small" data-act="editCalendar">Edit</button></div>
       <p class="muted">Dates are written the world's way, e.g. <b>${esc(fmtDate({ y: NOW().y, m: w.months.length ? 1 : undefined, d: w.months.length ? 1 : undefined }))}</b>.</p>
       <div class="kvs"><div class="kv"><span>Eras</span><div>${eras().map(e => `${esc(e.name)}${e.abbr ? ` (${esc(e.abbr)})` : ""} <small class="muted">${countsDown(e) ? `counts down to ${esc(eraNext(e).name)}` : `from year ${e.start}`}</small>`).join("<br>")}</div></div>
         <div class="kv"><span>Months</span><div>${w.months.length ? w.months.map(esc).join(", ") : `<span class="muted">None: dates are years only, or month numbers</span>`}</div></div></div></section>
@@ -140,6 +140,58 @@ ACT.calPreset = el => {
   t.dispatchEvent(new Event("input", { bubbles: true }));
   toast("Rename them to suit your world, then Save");
 };
+
+/* ── shifting dates ── add (or take away) years from everything dated on or
+   after a point: events, births and deaths, scenes, sessions, date fields,
+   versions, "now", and the eras that begin after it. Any {y, m?, d?} in the
+   world is a date. */
+const isDate = v => v && typeof v === "object" && !Array.isArray(v) && typeof v.y === "number" && Object.keys(v).every(k => k === "y" || k === "m" || k === "d");
+function eachDate(fn) {
+  // the same date object can sit in two places (a session started "now"): once each
+  const seen = new Set(), visit = (d, o, k) => { if (!seen.has(d)) { seen.add(d); fn(d, o, k); } };
+  const walk = (o, depth = 0) => {
+    if (!o || typeof o !== "object" || depth > 12) return;
+    for (const [k, v] of Object.entries(o)) {
+      if (isDate(v)) visit(v, o, k);
+      else if (v && typeof v === "object") walk(v, depth + 1);
+    }
+  };
+  for (const [k, v] of Object.entries(DB)) if (k !== "kinds" && k !== "world") walk(v);
+  if (isDate(DB.world.now)) visit(DB.world.now, DB.world, "now");
+}
+function shiftPlan(from, by, withEras) {
+  const fk = dateKey(from);
+  let n = 0;
+  eachDate(d => { if (dateKey(d) >= fk) n++; });
+  const es = withEras ? DB.world.eras.filter(e => e.start >= from.y && !(from.m && e.start === from.y)) : [];
+  return { n, es };
+}
+ACT.shiftDates = () => modal({ title: "Shift dates", wide: true,
+  body: `<p class="muted">Moves everything dated on or after a point in time by a number of years: events, births and deaths, scenes, sessions, date fields, and “now”. Something that began before the point and ends after it gets longer (or shorter). Use a minus number to move things earlier.</p>
+    <div class="row2">${dateField("From (everything on or after this)", "from", null)}${textField("By how many years", "by", "700", `type="number" step="1"`)}</div>
+    <label class="check"><input type="checkbox" name="eras" checked> Move the eras that begin at or after it too (so their names stay with the same events)</label>
+    <p class="shift-preview muted" id="shiftPreview">Type a date to see what moves.</p>`,
+  onOpen: w => {
+    const upd = () => {
+      const v = formVals(w), from = parseDate(v.from), by = parseInt(v.by);
+      const box = $("#shiftPreview", w);
+      if (!from || !by) { box.textContent = !from ? "Type a date to see what moves." : "Give a number of years."; return; }
+      const { n, es } = shiftPlan(from, by, v.eras);
+      box.innerHTML = `<b>${plural(n, "date")}</b> on or after ${esc(fmtDate(from))} move ${by > 0 ? "later" : "earlier"} by ${plural(Math.abs(by), "year")}${es.length ? `, and ${plural(es.length, "era")} (${esc(es.map(e => e.name).join(", "))})` : ""}.`;
+    };
+    w.addEventListener("input", upd); w.addEventListener("change", upd);
+  },
+  buttons: [{ label: "Cancel" }, { label: "Shift them", cls: "accent", act: w => {
+    const v = formVals(w), from = parseDate(v.from), by = parseInt(v.by);
+    if (!from) { toast("Type the date to shift from"); return false; }
+    if (!by) { toast("Give a number of years"); return false; }
+    const { n, es } = shiftPlan(from, by, v.eras);
+    const fk = dateKey(from);
+    withUndo(`${plural(n, "date")} moved by ${by > 0 ? "+" : ""}${by} years`, () => {
+      eachDate(d => { if (dateKey(d) >= fk) d.y += by; });
+      for (const e of es) e.start += by;
+    });
+  } }] });
 
 /* ── picking an icon ── emoji worth having in a fantasy world, each with the
    words it can be found by */
