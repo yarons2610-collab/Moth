@@ -172,7 +172,7 @@ function threadEditor(t, isNew) {
   const kindSel = `<select name="kind" data-change="threadKindPick">${Object.entries(THREAD_KINDS).map(([k, [n, i]]) => `<option value="${k}" ${k === (t.kind || "main") ? "selected" : ""}>${i} ${n}</option>`).join("")}</select>`;
   const arcBox = kind => (ARC_FIELDS[kind] || []).map(([k, l]) => areaField(l, "arc_" + k, t.arc?.[k] || "", 2, "data-links")).join("");
   modal({ title: isNew ? "New thread" : "Edit thread",
-    body: `<div class="row2">${textField("Name", "name", t.name, `autofocus placeholder="e.g. Lilyon learns to trust"`)}${field("Kind", kindSel)}</div>
+    body: `<div class="row2">${textField("Name", "name", t.name, `autofocus placeholder="e.g. Maren learns to ask for help"`)}${field("Kind", kindSel)}</div>
       <div class="row2">${field("Whose arc", `<select name="character">${entryOptions(t.character, { blank: "—", kind: "character" })}</select>`)}
         ${field("State", `<select name="state">${Object.entries(THREAD_STATES).map(([k, l]) => `<option value="${k}" ${k === (t.state || "planned") ? "selected" : ""}>${l}</option>`).join("")}</select>`)}</div>
       ${areaField("In short", "summary", t.summary || "", 3, "data-links")}
