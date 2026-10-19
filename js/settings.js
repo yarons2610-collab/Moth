@@ -27,8 +27,8 @@ addRoute("settings", "", () => {
     <section class="panel"><div class="panel-h"><h4>Space used</h4></div><div id="storageInfo" class="muted">Measuring…</div></section>
 
     <section class="panel"><div class="panel-h"><h4>Your data</h4></div>
-      <p class="muted">An export is one .json file with the whole world and its images.</p>
-      <div class="btn-row"><button class="btn" data-act="exportWorld">Export</button><button class="btn" data-act="importWorld">Import…</button>
+      <p class="muted"><b>Export to read</b> makes a Word document of the whole world (the codex, the timeline, the story) to read, print or share. <b>Export</b> makes one .json file with the whole world and its images, to keep as a backup or bring back into Moth.</p>
+      <div class="btn-row"><button class="btn" data-act="exportReadable">Export to read (Word)</button><button class="btn" data-act="exportWorld">Export (backup)</button><button class="btn" data-act="importWorld">Import…</button>
         <button class="btn" data-act="loadSample">Load the sample world</button><button class="btn danger" data-act="resetWorld">Start an empty world</button></div></section>
     <p class="muted small">Moth: a play on myth. Works offline, and can be installed from the browser's menu (Add to Home Screen). This is version <b id="appVersion">${APP_VERSION}</b>.</p>
   </div>`, showStorage];
@@ -392,6 +392,11 @@ ACT.syncTakeRemote = async () => {
 };
 ACT.syncOff = async () => { if (await ask("Stop syncing on this device?", "The world stays here and on GitHub; they just stop talking.", "Stop syncing", "")) { disconnectSync(); rerender(); } };
 
+ACT.exportReadable = () => modal({ title: "Export to read",
+  body: `<p class="muted">A Word document (.docx) of “${esc(DB.world.name)}”: every codex entry with its details and article, the timeline, your threads and themes, and every book. Nothing in Moth changes.</p>
+    <label class="check"><input type="checkbox" name="secrets" checked> Include 🙈 secret fields (leave this off for a copy to share with players)</label>
+    <label class="check"><input type="checkbox" name="story" checked> Include the story (threads, themes and books)</label>`,
+  buttons: [{ label: "Cancel" }, { label: "Export", cls: "accent", act: w => { const v = formVals(w); exportWorldDocx({ secrets: v.secrets, story: v.story }); } }] });
 ACT.exportWorld = async () => download(`${fileSlug(DB.world.name)}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(await exportBundle()));
 // importing lives in merge.js
 ACT.loadSample = async () => {

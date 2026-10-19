@@ -823,3 +823,15 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .codex-group .group-move .btn { margin-left: 0; min-width: 34px; padding: 3px 8px; font-size: 15px; line-height: 1; }
 .group-move .btn:disabled { opacity: .3; }
 .group-hint { margin: 2px 0 8px; }
+
+/* rearranging a book by dragging */
+.drag-h { flex: none; border: 0; background: transparent; color: var(--ink-faint); font-size: 18px; line-height: 1; padding: 8px 6px; cursor: grab; touch-action: none; border-radius: 6px; }
+.drag-h:hover { color: var(--ink); background: var(--panel2); }
+.dragging .drag-h { cursor: grabbing; }
+.scenes li.dragging .scene-row, .chapter.dragging { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: 10px; }
+.scenes li.dragging { opacity: .85; }
+.book-page.dragging-ch .scenes, .book-page.dragging-ch .chapter > .btn { display: none; }
+.book-page.dragging-ch .chapter { padding: 4px 0; }
+.scenes { min-height: 12px; }
+.sc-move { width: auto; max-width: 140px; padding: 3px 6px; font-size: 12px; color: var(--ink-dim); }
+.drag-hint { margin: 6px 0 -4px; }

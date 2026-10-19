@@ -61,31 +61,120 @@ addRoute("book", "story", id => {
   const b = byId(DB.books, id);
   if (!b) return `<div class="page">${empty("That book doesn't exist any more.")}</div>`;
   const chs = b.chapters || [];
-  return `<div class="page narrow">
+  const chOpts = sel => chs.map((c, i) => `<option value="${i}">→ ${i + 1}. ${esc(c.title)}</option>`).join("");
+  return [`<div class="page narrow book-page" data-book="${b.id}">
     <div class="crumbs"><a href="#/story">Story</a> ›</div>
     <div class="page-h"><h2>📖 ${esc(b.title)}</h2><div class="spacer"></div>
       <a class="btn accent" href="#/plan/${b.id}">Plan</a>
       <a class="btn" href="#/read/${b.id}">Read it all</a>
-      <button class="btn" data-act="exportBook" data-id="${b.id}">Export .md</button>
+      <button class="btn" data-act="exportBook" data-id="${b.id}">Export…</button>
       <button class="btn" data-act="editBook" data-id="${b.id}">Edit</button>
       <button class="btn ghost" data-act="deleteBook" data-id="${b.id}">🗑</button></div>
     ${mdBlock(b.summary)}
     <div class="muted">${bookWords(b).toLocaleString()} words${b.target ? ` of ${(+b.target).toLocaleString()} <progress max="${b.target}" value="${bookWords(b)}"></progress>` : ""}</div>
-    ${chs.map((ch, ci) => `<section class="chapter">
-      <div class="chapter-h"><h3>${ci + 1}. ${esc(ch.title)}</h3>
+    ${chs.length > 1 || chs.some(c => (c.scenes || []).length > 1) ? `<p class="muted small drag-hint">Drag ⠿ to move a chapter or a scene (scenes can go into another chapter), or use “Move to…”.</p>` : ""}
+    <div class="chapters">
+    ${chs.map((ch, ci) => `<section class="chapter" data-ci="${ci}">
+      <div class="chapter-h"><button type="button" class="drag-h" data-drag="ch" aria-label="Drag to move this chapter" title="Drag to move">⠿</button><h3>${ci + 1}. ${esc(ch.title)}</h3>
         <span class="row-tools"><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="1" title="Move down">↓</button>
         <button class="mini" data-act="renameCh" data-b="${b.id}" data-i="${ci}" title="Rename">✎</button><button class="mini" data-act="deleteCh" data-b="${b.id}" data-i="${ci}" title="Delete">🗑</button></span></div>
       <ol class="scenes">${(ch.scenes || []).map((sc, si) => {
         const pov = byId(DB.entries, sc.pov), set = byId(DB.entries, sc.setting), st = STATUSES[sc.status || "idea"];
-        return `<li><a class="scene-row" href="#/sc/${sc.id}"><span class="status" style="--c:${st[1]}">${st[0]}</span>
+        return `<li data-sid="${sc.id}"><button type="button" class="drag-h" data-drag="sc" aria-label="Drag to move this scene" title="Drag to move">⠿</button><a class="scene-row" href="#/sc/${sc.id}"><span class="status" style="--c:${st[1]}">${st[0]}</span>
           <b>${esc(sc.title)}</b><small>${[pov && "POV " + pov.name, set && set.name, sc.date && fmtDate(sc.date), countWords(sc.body) + " words"].filter(Boolean).map(esc).join(" · ")}</small></a>
-          <span class="row-tools"><button class="mini" data-act="moveSc" data-id="${sc.id}" data-d="-1">↑</button><button class="mini" data-act="moveSc" data-id="${sc.id}" data-d="1">↓</button></span></li>`;
+          <span class="row-tools"><button class="mini" data-act="moveSc" data-id="${sc.id}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveSc" data-id="${sc.id}" data-d="1" title="Move down">↓</button>
+            ${chs.length > 1 ? `<select class="sc-move" data-change="scMoveTo" data-id="${sc.id}" title="Move to another chapter" aria-label="Move to another chapter"><option value="">Move to…</option>${chOpts()}</select>` : ""}</span></li>`;
       }).join("")}</ol>
       <button class="btn small ghost" data-act="newScene" data-b="${b.id}" data-i="${ci}">+ Scene</button></section>`).join("")}
+    </div>
     <button class="btn" data-act="newChapter" data-id="${b.id}">+ Chapter</button>
     ${notesPanel("book", b.id)}
-  </div>`;
+  </div>`, wireBookDrag];
 });
+
+/* ── rearranging by dragging ── the ⠿ handle picks a chapter or a scene up;
+   it moves through the page as you drag, and dropping it saves the new
+   order. Only the order changes: the chapters and scenes themselves are
+   the same objects, put back in their new places. */
+function wireBookDrag(main) {
+  const page = $(".book-page", main);
+  if (!page) return;
+  const b = byId(DB.books, page.dataset.book);
+  page.addEventListener("pointerdown", e => {
+    const h = e.target.closest(".drag-h");
+    if (!h || e.button > 0) return;
+    e.preventDefault();
+    const kind = h.dataset.drag, item = kind === "ch" ? h.closest(".chapter") : h.closest("li");
+    const box = $(".chapters", page);
+    item.classList.add("dragging");
+    if (kind === "ch") page.classList.add("dragging-ch");
+    let y = e.clientY, scrollT = null;
+    const place = () => {
+      if (kind === "ch") {
+        const others = $$(".chapter:not(.dragging)", box);
+        const before = others.find(c => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+        before ? box.insertBefore(item, before) : box.append(item);
+      } else {
+        // the chapter under the finger (or the nearest), then the place among its scenes
+        const chs = $$(".chapter", box);
+        let ch = chs.find(c => { const r = c.getBoundingClientRect(); return y >= r.top && y <= r.bottom; });
+        if (!ch) ch = chs.reduce((best, c) => { const r = c.getBoundingClientRect(), d = Math.min(Math.abs(y - r.top), Math.abs(y - r.bottom)); return !best || d < best.d ? { c, d } : best; }, null)?.c;
+        if (!ch) return;
+        const ol = $("ol.scenes", ch), rows = $$("li:not(.dragging)", ol);
+        const before = rows.find(li => { const r = li.getBoundingClientRect(); return y < r.top + r.height / 2; });
+        before ? ol.insertBefore(item, before) : ol.append(item);
+      }
+    };
+    // near the top or bottom of the screen, keep scrolling while held there
+    const edge = () => {
+      const zone = 70, v = y < zone ? -(zone - y) / 3 : y > innerHeight - zone ? (y - innerHeight + zone) / 3 : 0;
+      if (v) { scrollBy(0, v); place(); }
+      scrollT = requestAnimationFrame(edge);
+    };
+    scrollT = requestAnimationFrame(edge);
+    // listened for on the whole page: moving the row through the page would
+    // otherwise lose track of the finger
+    const move = ev => { if (ev.pointerId === e.pointerId) { ev.preventDefault(); y = ev.clientY; place(); } };
+    const up = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      cancelAnimationFrame(scrollT);
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", up);
+      item.classList.remove("dragging"); page.classList.remove("dragging-ch");
+      applyBookOrder(b, box);
+    };
+    document.addEventListener("pointermove", move, { passive: false });
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", up);
+  });
+}
+// read the order off the page and put the same chapters and scenes in it
+function applyBookOrder(b, box) {
+  const chs = b.chapters || [], all = chs.flatMap(c => c.scenes || []), byIdSc = new Map(all.map(sc => [sc.id, sc]));
+  const sections = $$(".chapter", box);
+  const order = sections.map(sec => chs[+sec.dataset.ci]);
+  const scenes = sections.map(sec => $$("li[data-sid]", sec).map(li => byIdSc.get(li.dataset.sid)));
+  // never lose or double anything: the same chapters, the same scenes, or nothing changes
+  const same = order.length === chs.length && new Set(order).size === chs.length && order.every(Boolean)
+    && scenes.flat().length === all.length && new Set(scenes.flat()).size === all.length && scenes.flat().every(Boolean);
+  if (!same) return rerender();
+  const changed = order.some((c, i) => c !== chs[i]) || order.some((c, i) => (c.scenes || []).length !== scenes[i].length || scenes[i].some((sc, j) => c.scenes[j] !== sc));
+  if (!changed) return rerender();
+  order.forEach((c, i) => { c.scenes = scenes[i]; });
+  b.chapters = order;
+  commit();
+}
+ACT.scMoveTo = el => {
+  if (el.value === "") return;
+  const { ch, book } = sceneCtx(el.dataset.id), to = book.chapters[+el.value];
+  if (!to || to === ch) return rerender();
+  const i = ch.scenes.findIndex(s => s.id === el.dataset.id);
+  const [sc] = ch.scenes.splice(i, 1);
+  (to.scenes ||= []).push(sc);
+  commit();
+  toast(`Moved “${sc.title}” to the end of ${to.title}`);
+};
 
 /* ── the writing view ── */
 addRoute("sc", "story", id => {
@@ -166,10 +255,20 @@ ACT.deleteBook = async el => {
   withUndo("Book deleted", () => { DB.books = DB.books.filter(x => x !== b); });
   go("#/story");
 };
+// a copy to read or share: a Word document, or plain text. Only reads the book.
 ACT.exportBook = el => {
   const b = byId(DB.books, el.dataset.id);
-  const text = `# ${b.title}\n\n` + (b.chapters || []).map((ch, i) => `## ${i + 1}. ${ch.title}\n\n` + (ch.scenes || []).map(sc => plainLinks(sc.body).trim()).filter(Boolean).join("\n\n* * *\n\n")).join("\n\n");
-  download(fileSlug(b.title) + ".md", text, "text/markdown");
+  modal({ title: `Export “${b.title}”`,
+    body: `<p class="muted">A copy of the book to read, print or share. Nothing in Moth changes.</p>
+      <label class="check"><input type="radio" name="fmt" value="docx" checked> <span><b>Word document (.docx)</b>: opens in Word, Pages, Google Docs or LibreOffice. A title page, each chapter on a new page, scenes separated by ⁂.</span></label>
+      <label class="check"><input type="radio" name="fmt" value="md"> <span><b>Plain text (.md)</b>: the words only, for any text editor.</span></label>
+      <label class="check"><input type="checkbox" name="summaries"> Put each scene's title and one-line summary above it (a working draft rather than a manuscript)</label>`,
+    buttons: [{ label: "Cancel" }, { label: "Export", cls: "accent", act: w => {
+      const v = formVals(w);
+      if (v.fmt === "docx") return void exportBookDocx(b, { summaries: v.summaries });
+      const text = `# ${b.title}\n\n` + (b.chapters || []).map((ch, i) => `## ${i + 1}. ${ch.title}\n\n` + (ch.scenes || []).map(sc => (v.summaries ? `### ${sc.title}\n\n${sc.summary ? "_" + plainLinks(sc.summary) + "_\n\n" : ""}` : "") + plainLinks(sc.body).trim()).filter(Boolean).join("\n\n* * *\n\n")).join("\n\n");
+      download(fileSlug(b.title) + ".md", text, "text/markdown");
+    } }] });
 };
 function nameModal(title, value, done) {
   modal({ title, body: textField("Name", "name", value, "autofocus"), buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
