@@ -5,6 +5,9 @@
 
 const STATUSES = { idea: ["Idea", "#7c7c92"], outline: ["Outline", "#7ea8f8"], draft: ["Draft", "#e3c27a"], revised: ["Revised", "#b9a6ff"], done: ["Done", "#81b29a"] };
 const STORY = { read: false };
+// folded chapter plans on a book's page: remembered on this device
+try { STORY.plansHidden = localStorage.getItem("moth_plans_hidden") === "1"; } catch {}
+ACT.togglePlans = () => { STORY.plansHidden = !STORY.plansHidden; try { localStorage.setItem("moth_plans_hidden", STORY.plansHidden ? "1" : ""); } catch {} rerender(); };
 
 // not cached in the index: the index itself lists scenes through this
 function allScenes() {
@@ -72,13 +75,14 @@ addRoute("book", "story", id => {
       <button class="btn ghost" data-act="deleteBook" data-id="${b.id}">🗑</button></div>
     ${mdBlock(b.summary)}
     <div class="muted">${bookWords(b).toLocaleString()} words${b.target ? ` of ${(+b.target).toLocaleString()} <progress max="${b.target}" value="${bookWords(b)}"></progress>` : ""}</div>
+    ${chs.some(c => c.summary?.trim()) ? `<div class="btn-row plans-toggle"><button class="btn small" data-act="togglePlans">${STORY.plansHidden ? "▸ Show chapter plans" : "▾ Fold chapter plans away"}</button></div>` : ""}
     ${chs.length > 1 || chs.some(c => (c.scenes || []).length > 1) ? `<p class="muted small drag-hint">Drag ⠿ to move a chapter or a scene (scenes can go into another chapter), or use “Move to…”.</p>` : ""}
     <div class="chapters">
     ${chs.map((ch, ci) => `<section class="chapter" data-ci="${ci}">
       <div class="chapter-h"><button type="button" class="drag-h" data-drag="ch" aria-label="Drag to move this chapter" title="Drag to move">⠿</button><h3>${ci + 1}. ${esc(ch.title)}</h3>
         <span class="row-tools"><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="1" title="Move down">↓</button>
         <button class="mini" data-act="renameCh" data-b="${b.id}" data-i="${ci}" title="Edit the title and plan">✎</button><button class="mini" data-act="deleteCh" data-b="${b.id}" data-i="${ci}" title="Delete">🗑</button></span></div>
-      ${ch.summary?.trim() ? `<div class="ch-sum prose">${md(ch.summary)}</div>` : ""}
+      ${ch.summary?.trim() ? `<details class="ch-sum" ${STORY.plansHidden ? "" : "open"}><summary>Plan</summary><div class="prose">${md(ch.summary)}</div></details>` : ""}
       <ol class="scenes">${(ch.scenes || []).map((sc, si) => {
         const pov = byId(DB.entries, sc.pov), set = byId(DB.entries, sc.setting), st = STATUSES[sc.status || "idea"];
         return `<li data-sid="${sc.id}"><button type="button" class="drag-h" data-drag="sc" aria-label="Drag to move this scene" title="Drag to move">⠿</button><a class="scene-row" href="#/sc/${sc.id}"><span class="status" style="--c:${st[1]}">${st[0]}</span>

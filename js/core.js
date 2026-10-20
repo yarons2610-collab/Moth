@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-20b";
+const APP_VERSION = "2026-10-20c";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
