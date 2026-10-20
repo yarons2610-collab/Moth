@@ -835,3 +835,11 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .scenes { min-height: 12px; }
 .sc-move { width: auto; max-width: 140px; padding: 3px 6px; font-size: 12px; color: var(--ink-dim); }
 .drag-hint { margin: 6px 0 -4px; }
+
+/* a chapter's plan */
+.ch-sum { margin: -2px 0 8px 34px; padding: 6px 12px; border-left: 3px solid var(--line2); color: var(--ink-dim); font-size: 14px; }
+.ch-sum p, .ch-sum ul { margin: 4px 0; }
+.ch-plan { border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 10px; padding: 6px 12px; margin: -6px 0 10px; background: color-mix(in srgb, var(--accent) 4%, var(--bg2)); font-size: 14px; }
+.ch-plan summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+.ch-plan .prose { max-height: 40vh; overflow: auto; margin: 6px 0; }
+.ch-plan .btn { margin-bottom: 4px; }

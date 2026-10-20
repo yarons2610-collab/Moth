@@ -77,7 +77,8 @@ addRoute("book", "story", id => {
     ${chs.map((ch, ci) => `<section class="chapter" data-ci="${ci}">
       <div class="chapter-h"><button type="button" class="drag-h" data-drag="ch" aria-label="Drag to move this chapter" title="Drag to move">⠿</button><h3>${ci + 1}. ${esc(ch.title)}</h3>
         <span class="row-tools"><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="1" title="Move down">↓</button>
-        <button class="mini" data-act="renameCh" data-b="${b.id}" data-i="${ci}" title="Rename">✎</button><button class="mini" data-act="deleteCh" data-b="${b.id}" data-i="${ci}" title="Delete">🗑</button></span></div>
+        <button class="mini" data-act="renameCh" data-b="${b.id}" data-i="${ci}" title="Edit the title and plan">✎</button><button class="mini" data-act="deleteCh" data-b="${b.id}" data-i="${ci}" title="Delete">🗑</button></span></div>
+      ${ch.summary?.trim() ? `<div class="ch-sum prose">${md(ch.summary)}</div>` : ""}
       <ol class="scenes">${(ch.scenes || []).map((sc, si) => {
         const pov = byId(DB.entries, sc.pov), set = byId(DB.entries, sc.setting), st = STATUSES[sc.status || "idea"];
         return `<li data-sid="${sc.id}"><button type="button" class="drag-h" data-drag="sc" aria-label="Drag to move this scene" title="Drag to move">⠿</button><a class="scene-row" href="#/sc/${sc.id}"><span class="status" style="--c:${st[1]}">${st[0]}</span>
@@ -196,6 +197,7 @@ addRoute("sc", "story", id => {
       <button class="btn small ghost" data-act="deleteScene" data-id="${sc.id}" title="Delete scene">🗑</button>
     </div>
     <input class="scene-sum" value="${esc(sc.summary || "")}" placeholder="What happens, in a line" data-input="sceneSummary" data-id="${sc.id}" data-links>
+    ${chapterPlanHtml(book, ch, sc)}
     ${scenePlanHtml(sc, book)}
     ${STORY.read ? `<div class="prose manuscript">${md(sc.body) || empty("Nothing written yet.")}</div>`
       : `<textarea class="manuscript-ed" data-input="sceneBody" data-id="${sc.id}" placeholder="Write. [[Name]] links to the codex.">${esc(sc.body || "")}</textarea>`}
@@ -266,7 +268,7 @@ ACT.exportBook = el => {
     buttons: [{ label: "Cancel" }, { label: "Export", cls: "accent", act: w => {
       const v = formVals(w);
       if (v.fmt === "docx") return void exportBookDocx(b, { summaries: v.summaries });
-      const text = `# ${b.title}\n\n` + (b.chapters || []).map((ch, i) => `## ${i + 1}. ${ch.title}\n\n` + (ch.scenes || []).map(sc => (v.summaries ? `### ${sc.title}\n\n${sc.summary ? "_" + plainLinks(sc.summary) + "_\n\n" : ""}` : "") + plainLinks(sc.body).trim()).filter(Boolean).join("\n\n* * *\n\n")).join("\n\n");
+      const text = `# ${b.title}\n\n` + (b.chapters || []).map((ch, i) => `## ${i + 1}. ${ch.title}\n\n` + (v.summaries && ch.summary?.trim() ? plainLinks(ch.summary).trim() + "\n\n* * *\n\n" : "") + (ch.scenes || []).map(sc => (v.summaries ? `### ${sc.title}\n\n${sc.summary ? "_" + plainLinks(sc.summary) + "_\n\n" : ""}` : "") + plainLinks(sc.body).trim()).filter(Boolean).join("\n\n* * *\n\n")).join("\n\n");
       download(fileSlug(b.title) + ".md", text, "text/markdown");
     } }] });
 };
@@ -277,8 +279,33 @@ function nameModal(title, value, done) {
     done(v); commit();
   } }] });
 }
-ACT.newChapter = el => { const b = byId(DB.books, el.dataset.id); nameModal("New chapter", "Chapter " + ((b.chapters || []).length + 1), t => (b.chapters ||= []).push({ id: uid(), title: t, scenes: [] })); };
-ACT.renameCh = el => { const ch = byId(DB.books, el.dataset.b).chapters[+el.dataset.i]; nameModal("Rename chapter", ch.title, t => { ch.title = t; }); };
+// a chapter's title and its plan: what happens in it, to look at while writing it
+function chapterEditor(b, ch, isNew) {
+  modal({ title: isNew ? "New chapter" : "Edit chapter", wide: true,
+    body: `${textField("Title", "title", ch.title, "autofocus")}
+      ${areaField("Summary or plan: what happens in this chapter (shown above each of its scenes while you write; [[links]] work)", "summary", ch.summary || "", 8, `data-links placeholder="- Lilyon finds the petal\n- The inspector arrives\n- …"`)}`,
+    buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
+      const v = formVals(w);
+      if (!v.title.trim()) { toast("Give it a title"); return false; }
+      ch.title = v.title.trim();
+      if (v.summary.trim() || ch.summary) ch.summary = v.summary;
+      if (isNew) (b.chapters ||= []).push(ch);
+      commit();
+    } }] });
+}
+ACT.newChapter = el => { const b = byId(DB.books, el.dataset.id); chapterEditor(b, { id: uid(), title: "Chapter " + ((b.chapters || []).length + 1), summary: "", scenes: [] }, true); };
+ACT.renameCh = el => { const b = byId(DB.books, el.dataset.b); chapterEditor(b, b.chapters[+el.dataset.i], false); };
+ACT.editChPlan = el => { const { ch, book } = sceneCtx(el.dataset.sc); chapterEditor(book, ch, false); };
+// the chapter's plan above the scene being written, folded away if you like
+function chapterPlanHtml(book, ch, sc) {
+  const has = ch.summary?.trim();
+  return `<details class="ch-plan" ${has && STORY.chPlan !== false ? "open" : ""}>
+    <summary>Chapter plan: ${esc(ch.title)}${has ? "" : ` <small class="muted">(none yet)</small>`}</summary>
+    ${has ? `<div class="prose">${md(ch.summary)}</div>` : `<p class="muted small">Write what happens in this chapter, to keep in view while you write its scenes.</p>`}
+    <button class="btn small ghost" data-act="editChPlan" data-sc="${sc.id}">${has ? "✎ Edit the plan" : "+ Write the chapter's plan"}</button>
+  </details>`;
+}
+document.addEventListener("toggle", e => { if (e.target.matches?.(".ch-plan") && e.target.querySelector(".prose")) STORY.chPlan = e.target.open; }, true);
 ACT.deleteCh = async el => {
   const b = byId(DB.books, el.dataset.b), ch = b.chapters[+el.dataset.i];
   if (!await ask(`Delete “${ch.title}”?`, `Its ${plural((ch.scenes || []).length, "scene")} go with it. You can undo this straight afterwards.`)) return;
