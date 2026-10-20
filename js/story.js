@@ -200,7 +200,7 @@ addRoute("sc", "story", id => {
     ${chapterPlanHtml(book, ch, sc)}
     ${scenePlanHtml(sc, book)}
     ${STORY.read ? `<div class="prose manuscript">${md(sc.body) || empty("Nothing written yet.")}</div>`
-      : `<textarea class="manuscript-ed" data-input="sceneBody" data-id="${sc.id}" placeholder="Write. [[Name]] links to the codex.">${esc(sc.body || "")}</textarea>`}
+      : `<div class="fmt-host">${fmtBar()}<textarea class="manuscript-ed" data-input="sceneBody" data-id="${sc.id}" placeholder="Write. [[Name]] links to the codex.">${esc(sc.body || "")}</textarea></div>`}
     <div class="writer-foot"><span id="wc">${wcText(sc)}</span><span id="saved" class="muted"></span><span class="spacer"></span>
       ${prev ? `<a class="btn small" href="#/sc/${prev.sc.id}">← ${esc(prev.sc.title)}</a>` : ""}
       ${next ? `<a class="btn small" href="#/sc/${next.sc.id}">${esc(next.sc.title)} →</a>` : ""}</div>

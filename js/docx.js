@@ -39,17 +39,28 @@ function paraXml(p) {
 // **bold**, *italic*, _italic_ and [[links]] (written as their words) into runs
 function mdRuns(text) {
   const plain = String(text || "").replace(LINK_RE, (m, a, b) => (b || a).trim()).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1 ($2)").replace(/`([^`]+)`/g, "$1");
-  const runs = [], re = /\*\*([^*]+)\*\*|(^|[^*\w])\*([^*\n]+)\*(?!\w)|(^|[^\w])_([^_\n]+)_(?!\w)/g;
+  // bold first (it may hold italics), then italics inside each piece
+  const italics = (t, b) => {
+    const out = [], re = /(^|[^*\w])\*([^*\n]+)\*(?!\w)|(^|[^\w])_([^_\n]+)_(?!\w)/g;
+    let last = 0, m;
+    while ((m = re.exec(t))) {
+      const lead = m[1] ?? m[3] ?? "", start = m.index + lead.length;
+      if (start > last) out.push({ t: t.slice(last, start), b });
+      out.push({ t: m[2] ?? m[4], i: true, b });
+      last = m.index + m[0].length;
+    }
+    if (last < t.length) out.push({ t: t.slice(last), b });
+    return out;
+  };
+  const runs = [], re = /\*\*((?:[^*]|\*(?!\*))+?)\*\*/g;
   let last = 0, m;
   while ((m = re.exec(plain))) {
-    const lead = m[2] ?? m[4] ?? "", start = m.index + lead.length;
-    if (start > last) runs.push({ t: plain.slice(last, start) });
-    if (m[1] != null) runs.push({ t: m[1], b: true });
-    else runs.push({ t: m[3] ?? m[5], i: true });
+    if (m.index > last) runs.push(...italics(plain.slice(last, m.index), false));
+    runs.push(...italics(m[1], true));
     last = m.index + m[0].length;
   }
-  if (last < plain.length) runs.push({ t: plain.slice(last) });
-  return runs;
+  if (last < plain.length) runs.push(...italics(plain.slice(last), false));
+  return runs.filter(r => r.t);
 }
 // the same markdown the app shows, as paragraphs (lines inside a paragraph stay lines)
 function mdBlocks(src, shift = 0) {

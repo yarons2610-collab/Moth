@@ -843,3 +843,10 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .ch-plan summary { cursor: pointer; color: var(--accent); font-size: 13px; }
 .ch-plan .prose { max-height: 40vh; overflow: auto; margin: 6px 0; }
 .ch-plan .btn { margin-bottom: 4px; }
+
+/* the formatting toolbar over the draft */
+.fmt-bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 4px; align-items: center; padding: 6px 0; margin-bottom: 6px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.fmt-bar button { min-width: 36px; height: 32px; border: 1px solid var(--line2); background: var(--panel); color: var(--ink); border-radius: 7px; font: 15px var(--serif); }
+.fmt-bar button:hover { background: var(--panel2); }
+.fmt-hint { margin-left: auto; color: var(--ink-faint); font-size: 11.5px; }
+@media (max-width: 600px) { .fmt-hint { display: none; } }

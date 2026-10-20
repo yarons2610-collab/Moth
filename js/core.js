@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-20";
+const APP_VERSION = "2026-10-20b";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -219,7 +219,8 @@ function inline(raw) {
   x = x.replace(/`([^`]+)`/g, (m, c) => put("<code>" + c + "</code>"));
   x = x.replace(LINK_RE, (m, a, b) => put(wikiLink(unesc(a).trim(), b && unesc(b).trim())));
   x = x.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (m, t, u) => put(`<a href="${u}" target="_blank" rel="noopener">${t}</a>`));
-  x = x.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+  // bold may hold italics inside it (**Then *she* ran.**)
+  x = x.replace(/\*\*((?:[^*]|\*(?!\*))+?)\*\*/g, "<b>$1</b>")
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<i>$2</i>")
     .replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, "$1<i>$2</i>");
   if (!PLAYER_MODE) for (const hook of INLINE_HOOKS) x = hook(x);
@@ -511,3 +512,64 @@ ACT.multiDel = el => {
   inp.value = multiVals(inp.value).filter(x => x !== c.dataset.id).join(",");
   c.remove();
 };
+
+/* ── formatting while writing ── Ctrl/⌘ B and I in any text box make the
+   selection **bold** or *italic* (or take it off again), the way a word
+   processor does; the text is kept as Markdown, so it shows formatted
+   everywhere it's read and in exports. Edits go through the browser's own
+   undo, so Ctrl/⌘ Z takes them back. */
+function editText(el, start, end, text) {
+  el.focus();
+  el.setSelectionRange(start, end);
+  // insertText keeps the browser's undo history; setRangeText is the fallback
+  if (!document.execCommand?.("insertText", false, text)) { el.setRangeText(text, start, end, "end"); el.dispatchEvent(new Event("input", { bubbles: true })); }
+}
+function toggleMark(el, mark) {
+  const v = el.value;
+  let s = el.selectionStart, e = el.selectionEnd;
+  // a double-clicked word brings its space with it: leave spaces outside the marks
+  while (e > s && /\s/.test(v[e - 1])) e--;
+  while (s < e && /\s/.test(v[s])) s++;
+  const m = mark.length, sel = v.slice(s, e);
+  const isMark = (a, b) => v.slice(a, b) === mark && (mark === "**" || (v[a - 1] !== "*" || v.slice(a - 2, a) === "**") && (v[b] !== "*" || v.slice(b, b + 2) === "**"));
+  // already marked around the selection, or the selection includes the marks: take them off
+  if (sel && isMark(s - m, s) && isMark(e, e + m)) { editText(el, s - m, e + m, sel); el.setSelectionRange(s - m, e - m); return; }
+  if (sel.length > 2 * m && sel.startsWith(mark) && sel.endsWith(mark)) { const inner = sel.slice(m, -m); editText(el, s, e, inner); el.setSelectionRange(s, s + inner.length); return; }
+  if (!sel) { editText(el, s, s, mark + mark); el.setSelectionRange(s + m, s + m); return; }
+  // across paragraphs, each line is marked on its own (marks don't reach over a blank line)
+  const out = sel.split("\n").map(l => l.trim() ? l.replace(/^(\s*(?:[-*•]\s+|\d+[.)]\s+|>\s?)?)(.*?)(\s*)$/, (x, pre, body, post) => pre + mark + body + mark + post) : l).join("\n");
+  editText(el, s, e, out);
+  el.setSelectionRange(s, s + out.length);
+}
+// a quote (> at the start of each line), or a scene break, for the toolbar
+function toggleQuote(el) {
+  const v = el.value, s = v.lastIndexOf("\n", el.selectionStart - 1) + 1;
+  let e = v.indexOf("\n", Math.max(el.selectionEnd - 1, el.selectionStart)); if (e < 0) e = v.length;
+  const lines = v.slice(s, e).split("\n"), quoted = lines.filter(l => l.trim()).every(l => /^>\s?/.test(l));
+  const out = lines.map(l => !l.trim() ? l : quoted ? l.replace(/^>\s?/, "") : "> " + l).join("\n");
+  editText(el, s, e, out);
+  el.setSelectionRange(s, s + out.length);
+}
+function insertBreak(el) {
+  const v = el.value, s = el.selectionStart;
+  const before = v.slice(0, s).replace(/\s*$/, ""), lead = before ? "\n\n" : "", trail = "\n\n";
+  editText(el, before.length, el.selectionEnd, lead + "* * *" + trail);
+}
+document.addEventListener("keydown", e => {
+  const el = e.target;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || !(el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && (el.type === "text" || el.type === "search" || !el.type)))) return;
+  const k = e.key.toLowerCase();
+  if (k === "b") { e.preventDefault(); toggleMark(el, "**"); }
+  else if (k === "i") { e.preventDefault(); toggleMark(el, "*"); }
+});
+ACT.fmt = el => {
+  const t = el.closest(".fmt-host")?.querySelector("textarea");
+  if (!t) return;
+  ({ b: () => toggleMark(t, "**"), i: () => toggleMark(t, "*"), q: () => toggleQuote(t), br: () => insertBreak(t) })[el.dataset.f]?.();
+};
+// the toolbar keeps the selection in the box it formats
+document.addEventListener("mousedown", e => { if (e.target.closest(".fmt-bar button")) e.preventDefault(); });
+const fmtBar = () => `<div class="fmt-bar" role="toolbar" aria-label="Formatting">
+  <button type="button" data-act="fmt" data-f="b" title="Bold (Ctrl/⌘ B)"><b>B</b></button><button type="button" data-act="fmt" data-f="i" title="Italic (Ctrl/⌘ I)"><i>I</i></button>
+  <button type="button" data-act="fmt" data-f="q" title="Quote: a passage set apart">❝</button><button type="button" data-act="fmt" data-f="br" title="Scene break">⁂</button>
+  <span class="fmt-hint">Ctrl/⌘ B bold · Ctrl/⌘ I italic</span></div>`;

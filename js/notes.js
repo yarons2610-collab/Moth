@@ -59,7 +59,7 @@ addRoute("note", "notes", id => {
     <div class="note-links"><span class="muted small">Linked to</span>
       ${noteLinks(n).map(({ t, it, k }) => chip(t, it, ` <button class="mini" data-act="noteUnlink" data-id="${n.id}" data-k="${esc(k)}" title="Unlink">✕</button>`)).join("")}
       <span class="link-add"><input placeholder="+ Link to…" data-input="noteLinkSearch" data-id="${n.id}" autocomplete="off"><div class="link-results" id="noteLinkResults"></div></span></div>
-    ${NOTES.edit ? `<textarea class="manuscript-ed" data-input="noteBody" data-id="${n.id}" placeholder="Write. [[Name]] links to anything.">${esc(n.body)}</textarea>`
+    ${NOTES.edit ? `<div class="fmt-host">${fmtBar()}<textarea class="manuscript-ed" data-input="noteBody" data-id="${n.id}" placeholder="Write. [[Name]] links to anything.">${esc(n.body)}</textarea></div>`
       : mdBlock(n.body, `<p class="empty">Empty. <a data-act="noteMode">Start writing</a>.</p>`)}
     ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it)).join("")}</div></section>` : ""}
   </div>`, main => { const t = $(".manuscript-ed", main); if (t) { autoGrow(t); if (!n.body) t.focus(); } }];
