@@ -44,6 +44,6 @@ ACT.find = () => {
     } });
 };
 document.addEventListener("keydown", e => {
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  const typing = isTyping(e.target);
   if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing && !MODALS.length)) { e.preventDefault(); ACT.find(); }
 });

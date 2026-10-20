@@ -49,7 +49,7 @@ if (!PLAYER_MODE) {
   setInterval(updateScreenBtn, 3000);
   // Shift+B: black the player screen out, from anywhere
   document.addEventListener("keydown", e => {
-    if (e.key === "B" && e.shiftKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); showOnScreen({ kind: "black" }); }
+    if (e.key === "B" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target)) { e.preventDefault(); showOnScreen({ kind: "black" }); }
   });
 }
 

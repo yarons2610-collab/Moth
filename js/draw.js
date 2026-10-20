@@ -594,7 +594,7 @@ ACT.wallDone = () => {
 ACT.drawUndo = () => { if (!ED.undo.length) return; ED.redo.push(JSON.stringify(ED.d)); ED.d = JSON.parse(ED.undo.pop()); ED.dirty = true; redrawEd(); saveDraft(); };
 ACT.drawRedo = () => { if (!ED.redo.length) return; ED.undo.push(JSON.stringify(ED.d)); ED.d = JSON.parse(ED.redo.pop()); ED.dirty = true; redrawEd(); saveDraft(); };
 document.addEventListener("keydown", e => {
-  if (CUR.prefix !== "draw" || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (CUR.prefix !== "draw" || isTyping(e.target)) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? ACT.drawRedo() : ACT.drawUndo(); }
   else if (e.key === "Escape" && ED.wall.length && !MODALS.length) { ED.wall = []; rerender(); }
   else if (e.key === "Enter" && ED.wall.length) ACT.wallDone();

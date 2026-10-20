@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-21";
+const APP_VERSION = "2026-10-21b";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -285,6 +285,10 @@ function route() {
 }
 function rerender() { const main = $("#main"), y = main.scrollTop; route(); main.scrollTop = y; }
 const go = hash => { if (location.hash === hash) rerender(); else location.hash = hash; };
+
+// is someone typing (in any box, the formatted writing box included)? then
+// single-key shortcuts stand aside
+const isTyping = el => /^(INPUT|TEXTAREA|SELECT)$/.test(el?.tagName) || !!el?.isContentEditable;
 
 /* ── actions ── data-act="name" on anything clickable runs ACT.name(el, event);
    data-change / data-input do the same for change and input events. */
