@@ -204,11 +204,16 @@ addRoute("sc", "story", id => {
     ${chapterPlanHtml(book, ch, sc)}
     ${scenePlanHtml(sc, book)}
     ${STORY.read ? `<div class="prose manuscript">${md(sc.body) || empty("Nothing written yet.")}</div>`
-      : `<div class="fmt-host">${fmtBar()}<textarea class="manuscript-ed" data-input="sceneBody" data-id="${sc.id}" placeholder="Write. [[Name]] links to the codex.">${esc(sc.body || "")}</textarea></div>`}
+      : STORY.plain ? `<div class="fmt-host">${fmtBar("togglePlain")}<textarea class="manuscript-ed" data-input="sceneBody" data-id="${sc.id}" placeholder="Write. [[Name]] links to the codex.">${esc(sc.body || "")}</textarea></div>`
+      : `<div class="fmt-host">${fmtBar("togglePlain")}<div class="manuscript-ed wysi" contenteditable="true" spellcheck="true" data-sc="${sc.id}" data-ph="Write. [[Name]] links to the codex.">${wysiHtml(sc.body || "")}</div></div>`}
     <div class="writer-foot"><span id="wc">${wcText(sc)}</span><span id="saved" class="muted"></span><span class="spacer"></span>
       ${prev ? `<a class="btn small" href="#/sc/${prev.sc.id}">← ${esc(prev.sc.title)}</a>` : ""}
       ${next ? `<a class="btn small" href="#/sc/${next.sc.id}">${esc(next.sc.title)} →</a>` : ""}</div>
-  </div>`, main => { const t = $(".manuscript-ed", main); if (t) autoGrow(t); }];
+  </div>`, main => {
+    const w = $(".wysi", main);
+    if (w) return wireWysi(w, md => { sc.body = md; $("#wc").innerHTML = wcText(sc); sceneQuietSave(sc); });
+    const t = $(".manuscript-ed", main); if (t) autoGrow(t);
+  }];
 });
 function wcText(sc) {
   const n = countWords(sc.body);
@@ -230,6 +235,8 @@ ACT.sceneDate = el => {
   if (el.value.trim() && !d) return toast("That isn't a date I can read");
   sc.date = d; el.value = fmtDate(d); save({ quiet: true });
 };
+ACT.togglePlain = () => { clearTimeout(sceneSaveT); save({ quiet: true }); STORY.plain = !STORY.plain; try { localStorage.setItem("moth_plain", STORY.plain ? "1" : ""); } catch {} rerender(); };
+try { STORY.plain = localStorage.getItem("moth_plain") === "1"; } catch {}
 ACT.toggleRead = () => { clearTimeout(sceneSaveT); save({ quiet: true }); STORY.read = !STORY.read; rerender(); };
 
 addRoute("read", "story", id => {

@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-20c";
+const APP_VERSION = "2026-10-21";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -563,13 +563,15 @@ document.addEventListener("keydown", e => {
   else if (k === "i") { e.preventDefault(); toggleMark(el, "*"); }
 });
 ACT.fmt = el => {
+  const w = wysiFor(el);
+  if (w) return wysiCommand(w, el.dataset.f);
   const t = el.closest(".fmt-host")?.querySelector("textarea");
   if (!t) return;
   ({ b: () => toggleMark(t, "**"), i: () => toggleMark(t, "*"), q: () => toggleQuote(t), br: () => insertBreak(t) })[el.dataset.f]?.();
 };
 // the toolbar keeps the selection in the box it formats
 document.addEventListener("mousedown", e => { if (e.target.closest(".fmt-bar button")) e.preventDefault(); });
-const fmtBar = () => `<div class="fmt-bar" role="toolbar" aria-label="Formatting">
+const fmtBar = (plainToggle = "") => `<div class="fmt-bar" role="toolbar" aria-label="Formatting">
   <button type="button" data-act="fmt" data-f="b" title="Bold (Ctrl/⌘ B)"><b>B</b></button><button type="button" data-act="fmt" data-f="i" title="Italic (Ctrl/⌘ I)"><i>I</i></button>
   <button type="button" data-act="fmt" data-f="q" title="Quote: a passage set apart">❝</button><button type="button" data-act="fmt" data-f="br" title="Scene break">⁂</button>
-  <span class="fmt-hint">Ctrl/⌘ B bold · Ctrl/⌘ I italic</span></div>`;
+  <span class="fmt-hint">Ctrl/⌘ B bold · Ctrl/⌘ I italic</span>${plainToggle ? `<button type="button" class="fmt-mode" data-act="${plainToggle}" title="Show the text with its formatting marks (needed for [[links]] suggestions), or formatted">${STORY.plain ? "Formatted" : "Plain text"}</button>` : ""}</div>`;

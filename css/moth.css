@@ -857,3 +857,12 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
   .scenes li .scene-row { flex: 1 1 calc(100% - 40px); }
   .scenes li .row-tools { flex: 1 0 100%; justify-content: flex-end; padding-left: 34px; }
 }
+
+/* the formatted writing box */
+.wysi { position: relative; min-height: 320px; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
+.wysi > div { min-height: 1.75em; }
+.wysi > div.q { margin: 0 0 0 1.2em; padding-left: .9em; border-left: 3px solid var(--line2); font-style: italic; color: var(--ink-dim); }
+.wysi > div.q i { font-style: normal; }
+.wysi > .brk { text-align: center; color: var(--ink-faint); letter-spacing: .4em; user-select: none; margin: .4em 0; }
+.wysi.is-empty::before { content: attr(data-ph); color: var(--ink-faint); position: absolute; pointer-events: none; }
+.fmt-mode { margin-left: 8px; min-width: auto !important; padding: 0 10px; font: 12px var(--sans, inherit) !important; color: var(--ink-dim) !important; }
