@@ -6,8 +6,27 @@
 const STATUSES = { idea: ["Idea", "#7c7c92"], outline: ["Outline", "#7ea8f8"], draft: ["Draft", "#e3c27a"], revised: ["Revised", "#b9a6ff"], done: ["Done", "#81b29a"] };
 const STORY = { read: false };
 // folded chapter plans on a book's page: remembered on this device
-try { STORY.plansHidden = localStorage.getItem("moth_plans_hidden") === "1"; } catch {}
-ACT.togglePlans = () => { STORY.plansHidden = !STORY.plansHidden; try { localStorage.setItem("moth_plans_hidden", STORY.plansHidden ? "1" : ""); } catch {} rerender(); };
+// which chapters' plans are folded away, on the book's page and above the
+// draft: remembered on this device, chapter by chapter
+const FOLD = { book: new Set(), write: new Set() };
+try { for (const k of ["book", "write"]) FOLD[k] = new Set(JSON.parse(localStorage.getItem("moth_folded_" + k) || "[]")); } catch {}
+function setFolded(where, id, folded) {
+  if (!id) return;
+  FOLD[where][folded ? "add" : "delete"](id);
+  try { localStorage.setItem("moth_folded_" + where, JSON.stringify([...FOLD[where]])); } catch {}
+}
+ACT.togglePlans = el => {
+  const b = byId(DB.books, el.dataset.id), ids = (b.chapters || []).filter(c => c.summary?.trim()).map(c => c.id);
+  const fold = ids.some(id => !FOLD.book.has(id));
+  for (const id of ids) setFolded("book", id, fold);
+  rerender();
+};
+document.addEventListener("toggle", e => {
+  const d = e.target;
+  if (d.matches?.(".ch-sum")) setFolded("book", d.dataset.ch, !d.open);
+  if (d.matches?.(".ch-plan") && d.querySelector(".prose")) setFolded("write", d.dataset.ch, !d.open);
+  if (d.matches?.(".ch-sum")) { const btn = $("[data-act=togglePlans]"); if (btn) btn.textContent = $$(".ch-sum[open]").length ? "▾ Fold chapter plans away" : "▸ Show chapter plans"; }
+}, true);
 
 // not cached in the index: the index itself lists scenes through this
 function allScenes() {
@@ -75,14 +94,14 @@ addRoute("book", "story", id => {
       <button class="btn ghost" data-act="deleteBook" data-id="${b.id}">🗑</button></div>
     ${mdBlock(b.summary)}
     <div class="muted">${bookWords(b).toLocaleString()} words${b.target ? ` of ${(+b.target).toLocaleString()} <progress max="${b.target}" value="${bookWords(b)}"></progress>` : ""}</div>
-    ${chs.some(c => c.summary?.trim()) ? `<div class="btn-row plans-toggle"><button class="btn small" data-act="togglePlans">${STORY.plansHidden ? "▸ Show chapter plans" : "▾ Fold chapter plans away"}</button></div>` : ""}
+    ${chs.some(c => c.summary?.trim()) ? `<div class="btn-row plans-toggle"><button class="btn small" data-act="togglePlans" data-id="${b.id}">${chs.some(c => c.summary?.trim() && !FOLD.book.has(c.id)) ? "▾ Fold chapter plans away" : "▸ Show chapter plans"}</button></div>` : ""}
     ${chs.length > 1 || chs.some(c => (c.scenes || []).length > 1) ? `<p class="muted small drag-hint">Drag ⠿ to move a chapter or a scene (scenes can go into another chapter), or use “Move to…”.</p>` : ""}
     <div class="chapters">
     ${chs.map((ch, ci) => `<section class="chapter" data-ci="${ci}">
       <div class="chapter-h"><button type="button" class="drag-h" data-drag="ch" aria-label="Drag to move this chapter" title="Drag to move">⠿</button><h3>${ci + 1}. ${esc(ch.title)}</h3>
         <span class="row-tools"><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="1" title="Move down">↓</button>
         <button class="mini" data-act="renameCh" data-b="${b.id}" data-i="${ci}" title="Edit the title and plan">✎</button><button class="mini" data-act="deleteCh" data-b="${b.id}" data-i="${ci}" title="Delete">🗑</button></span></div>
-      ${ch.summary?.trim() ? `<details class="ch-sum" ${STORY.plansHidden ? "" : "open"}><summary>Plan</summary><div class="prose">${md(ch.summary)}</div></details>` : ""}
+      ${ch.summary?.trim() ? `<details class="ch-sum" data-ch="${ch.id}" ${FOLD.book.has(ch.id) ? "" : "open"}><summary>Plan</summary><div class="prose">${md(ch.summary)}</div></details>` : ""}
       <ol class="scenes">${(ch.scenes || []).map((sc, si) => {
         const pov = byId(DB.entries, sc.pov), set = byId(DB.entries, sc.setting), st = STATUSES[sc.status || "idea"];
         return `<li data-sid="${sc.id}"><button type="button" class="drag-h" data-drag="sc" aria-label="Drag to move this scene" title="Drag to move">⠿</button><a class="scene-row" href="#/sc/${sc.id}"><span class="status" style="--c:${st[1]}">${st[0]}</span>
@@ -310,13 +329,12 @@ ACT.editChPlan = el => { const { ch, book } = sceneCtx(el.dataset.sc); chapterEd
 // the chapter's plan above the scene being written, folded away if you like
 function chapterPlanHtml(book, ch, sc) {
   const has = ch.summary?.trim();
-  return `<details class="ch-plan" ${has && STORY.chPlan !== false ? "open" : ""}>
+  return `<details class="ch-plan" data-ch="${ch.id}" ${has && !FOLD.write.has(ch.id) ? "open" : ""}>
     <summary>Chapter plan: ${esc(ch.title)}${has ? "" : ` <small class="muted">(none yet)</small>`}</summary>
     ${has ? `<div class="prose">${md(ch.summary)}</div>` : `<p class="muted small">Write what happens in this chapter, to keep in view while you write its scenes.</p>`}
     <button class="btn small ghost" data-act="editChPlan" data-sc="${sc.id}">${has ? "✎ Edit the plan" : "+ Write the chapter's plan"}</button>
   </details>`;
 }
-document.addEventListener("toggle", e => { if (e.target.matches?.(".ch-plan") && e.target.querySelector(".prose")) STORY.chPlan = e.target.open; }, true);
 ACT.deleteCh = async el => {
   const b = byId(DB.books, el.dataset.b), ch = b.chapters[+el.dataset.i];
   if (!await ask(`Delete “${ch.title}”?`, `Its ${plural((ch.scenes || []).length, "scene")} go with it. You can undo this straight afterwards.`)) return;
