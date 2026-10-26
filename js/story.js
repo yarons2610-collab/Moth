@@ -311,9 +311,10 @@ function nameModal(title, value, done) {
 }
 // a chapter's title and its plan: what happens in it, to look at while writing it
 function chapterEditor(b, ch, isNew) {
-  modal({ title: isNew ? "New chapter" : "Edit chapter", wide: true,
+  // a big window: a chapter's plan can run long
+  modal({ title: isNew ? "New chapter" : "Edit chapter", wide: true, cls: "tall",
     body: `${textField("Title", "title", ch.title, "autofocus")}
-      ${areaField("Summary or plan: what happens in this chapter (shown above each of its scenes while you write; [[links]] work)", "summary", ch.summary || "", 8, `data-links placeholder="- Lilyon finds the petal\n- The inspector arrives\n- …"`)}`,
+      ${field("Summary or plan: what happens in this chapter (shown above each of its scenes while you write; [[links]] work)", `<textarea name="summary" data-links placeholder="- The heroine finds the letter\n- The inspector arrives\n- …">${esc(ch.summary || "")}</textarea>`, "grow")}`,
     buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
       const v = formVals(w);
       if (!v.title.trim()) { toast("Give it a title"); return false; }

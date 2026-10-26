@@ -866,3 +866,9 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .wysi > .brk { text-align: center; color: var(--ink-faint); letter-spacing: .4em; user-select: none; margin: .4em 0; }
 .wysi.is-empty::before { content: attr(data-ph); color: var(--ink-faint); position: absolute; pointer-events: none; }
 .fmt-mode { margin-left: 8px; min-width: auto !important; padding: 0 10px; font: 12px var(--sans, inherit) !important; color: var(--ink-dim) !important; }
+
+/* a window for long writing (a chapter's plan): fills most of the screen */
+.modal.tall { width: min(1100px, 100%); height: calc(100dvh - 32px); }
+.modal.tall .modal-b { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.modal.tall .fld.grow { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; }
+.modal.tall .fld.grow textarea { flex: 1; min-height: 12em; resize: none; font-size: 16px; line-height: 1.6; padding: 12px 14px; }
