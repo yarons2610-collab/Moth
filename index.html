@@ -32,11 +32,12 @@
     </nav>
     <div class="top-tools">
       <button class="icon-btn" id="screenBtn" data-act="screenPanel" title="Player screen">📺</button>
+      <button class="icon-btn" data-act="sideToggle" title="Side panel: open a codex entry, the timeline, notes… beside your work">◫</button>
       <button class="icon-btn" data-act="find" title="Find anything (Ctrl/⌘ K or /)">⌕</button>
       <a class="icon-btn" href="#/settings" title="Settings and sync"><span class="sync-dot" id="syncDot"></span>⚙</a>
     </div>
   </header>
-  <main id="main"></main>
+  <div class="workspace"><main id="main"></main><aside id="side" hidden aria-label="Side panel"></aside></div>
 </div>
 <div id="toasts"></div>
 
@@ -64,6 +65,7 @@
 <script src="js/merge.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/sample.js"></script>
+<script src="js/side.js"></script>
 <script src="js/boot.js"></script>
 </body>
 </html>

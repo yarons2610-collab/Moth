@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-29";
+const APP_VERSION = "2026-10-29b";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -284,10 +284,20 @@ function route() {
   if (html != null) main.innerHTML = html;
   after?.(main);
   $("#worldName").textContent = DB.world.name;
+  if (typeof renderSide === "function") renderSide();
   emit("route", CUR);
 }
-function rerender() { const main = $("#main"), y = main.scrollTop; route(); main.scrollTop = y; }
-const go = hash => { if (location.hash === hash) rerender(); else location.hash = hash; };
+// after a change: redraw. A change made in the side panel while a scene is
+// being written redraws only the panel, so the writing isn't disturbed.
+function rerender() {
+  if (typeof SIDE !== "undefined" && SIDE.open && SIDE.owner && CUR.prefix === "sc") return renderSide();
+  const main = $("#main"), y = main.scrollTop; route(); main.scrollTop = y;
+}
+// go somewhere: in the side panel if that's where you're working
+const go = hash => {
+  if (typeof SIDE !== "undefined" && SIDE.open && SIDE.owner && sideView(hash)) return sideGo(hash);
+  if (location.hash === hash) rerender(); else location.hash = hash;
+};
 
 // is someone typing (in any box, the formatted writing box included)? then
 // single-key shortcuts stand aside

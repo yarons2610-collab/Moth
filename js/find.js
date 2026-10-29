@@ -37,9 +37,10 @@ ACT.find = () => {
           sel = clamp(sel + (e.key === "ArrowDown" ? 1 : -1), 0, hits.length - 1);
           $$(".find-hit", res).forEach((a, i) => a.classList.toggle("on", i === sel));
           $$(".find-hit", res)[sel]?.scrollIntoView({ block: "nearest" });
-        } else if (e.key === "Enter" && hits[sel]) { e.preventDefault(); location.hash = infoOf(hits[sel].t, hits[sel].it).href; api.close(); }
+        } else if (e.key === "Enter" && hits[sel]) { e.preventDefault(); api.close(); go(infoOf(hits[sel].t, hits[sel].it).href); }
       });
-      res.addEventListener("click", e => { if (e.target.closest("a")) setTimeout(api.close); });
+      // opened from the side panel, a result opens there (go decides)
+      res.addEventListener("click", e => { const a = e.target.closest("a[href]"); if (a) { e.preventDefault(); api.close(); go(a.getAttribute("href")); } else if (e.target.closest("a")) setTimeout(api.close); });
       draw();
     } });
 };
