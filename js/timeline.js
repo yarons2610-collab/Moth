@@ -7,21 +7,54 @@ const TL = { follow: "", q: "", show: { event: true, life: true, story: true, pl
 // each source: () → [{ date, end?, title, href, icon, color, kind, ids: [entry ids], sub? }]
 const TIMELINE_SOURCES = [];
 
+/* ── events are codex entries ── every timeline event has an entry of the
+   Event kind in the codex, and that entry is what it says: its name, dates,
+   article, tags, colour and who was involved are what the timeline shows.
+   Edit it in either place and it's the same thing. Events from before this
+   each got their entry once, made from the event word for word. An event
+   tied to an entry of another kind (Lore, say) stays on the timeline and
+   follows that entry the same way. */
+function syncEvents(db = DB) {
+  const evKind = db.kinds.find(k => k.id === "event");
+  if (!evKind) return;
+  const inv = evKind.fields.find(f => norm(f.name) === "involved")?.id;
+  const entries = new Map(db.entries.map(e => [e.id, e]));
+  const linked = new Map();
+  for (const ev of db.events) {
+    let e = ev.entry && entries.get(ev.entry);
+    if (!e) {
+      e = { id: uid(), kind: "event", name: ev.title || "Untitled event", aliases: [], tags: [...(ev.tags || [])], color: ev.color || "", summary: "",
+        body: ev.body || "", fields: inv && (ev.involves || []).length ? { [inv]: [...ev.involves] } : {}, rels: [],
+        start: ev.date ? { ...ev.date } : null, end: ev.end ? { ...ev.end } : null, created: Date.now() };
+      db.entries.push(e); entries.set(e.id, e); ev.entry = e.id;
+    }
+    linked.set(e.id, ev);
+  }
+  for (const e of db.entries) {
+    let ev = linked.get(e.id);
+    if (!ev) { if (e.kind !== "event") continue; ev = { id: uid(), entry: e.id }; db.events.push(ev); }
+    ev.title = e.name; ev.body = e.body || ""; ev.tags = [...(e.tags || [])]; ev.color = e.color || "";
+    ev.date = e.start ? { ...e.start } : null; ev.end = e.end ? { ...e.end } : null;
+    if (e.kind === "event") ev.involves = inv ? [...(Array.isArray(e.fields?.[inv]) ? e.fields[inv] : [])] : [];
+  }
+}
+const evEntry = ev => byId(DB.entries, ev.entry);
 linkType("ev", {
   list: () => DB.events,
-  names: ev => [ev.title],
+  names: () => [], // [[links]] find the codex entry by its name instead
   info: ev => ({ title: ev.title, sub: fmtDate(ev.date) || "Event", icon: "⏳", color: ev.color || "#c9b27a" }),
-  href: ev => "#/ev/" + ev.id,
-  text: ev => ev.body,
-  edges: ev => (ev.involves || []).map(id => ["e", id, "involves"]),
+  href: ev => ev.entry ? "#/e/" + ev.entry : "#/timeline",
+  text: () => "",
+  edges: () => [],
 });
 
 TIMELINE_SOURCES.push(() => DB.events.filter(ev => ev.date).map(ev => ({
-  date: ev.date, end: ev.end, title: ev.title, href: "#/ev/" + ev.id, icon: "⏳", color: ev.color, kind: "event",
+  date: ev.date, end: ev.end, title: ev.title, href: "#/e/" + ev.entry, icon: evEntry(ev) && evEntry(ev).kind !== "event" ? kindOf(evEntry(ev)).icon : "⏳", color: ev.color, kind: "event",
   ids: [...new Set([...(ev.involves || []), ...mentionsIn(ev.body).filter(m => m.t === "e").map(m => m.it.id)])], sub: ev.body,
 })));
 TIMELINE_SOURCES.push(() => DB.entries.flatMap(e => {
   const k = kindOf(e), out = [];
+  if (DB.events.some(ev => ev.entry === e.id)) return out; // it's on the line as an event already
   if (e.start) out.push({ date: e.start, title: `${e.name}: ${(k.startLabel || "begins").toLowerCase()}`, href: "#/e/" + e.id, icon: k.icon, color: entryColor(e), kind: "life", ids: [e.id, ...famGet("parents", e.id)] });
   if (e.end) out.push({ date: e.end, title: `${e.name}: ${(k.endLabel || "ends").toLowerCase()}`, href: "#/e/" + e.id, icon: k.icon, color: entryColor(e), kind: "life", ids: [e.id] });
   return out;
@@ -65,7 +98,7 @@ addRoute("timeline", "timeline", () => {
   const undated = TL.show.event === false ? [] : DB.events.filter(ev => !ev.date &&
     (!who || (ev.involves || []).includes(who.id) || mentionsIn(ev.body).some(m => m.it === who)) &&
     (!q || norm(ev.title + " " + ev.body).includes(q)));
-  const people = DB.entries.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const people = DB.entries.filter(e => e.kind !== "event").sort((a, b) => a.name.localeCompare(b.name));
   const kinds = { event: "Events", life: "Lifespans", story: "Scenes", play: "Sessions" };
   return `<div class="page">
     <div class="page-h"><h2>Timeline</h2><div class="spacer"></div>
@@ -80,9 +113,9 @@ addRoute("timeline", "timeline", () => {
     <div class="tl">${html || (undated.length ? "" : empty("Nothing dated yet. Add an event, or give codex entries a date."))}</div>
     ${undated.length ? `<section class="panel undated"><div class="panel-h"><h4>Not dated yet</h4></div>
       <p class="muted small">These events have no date, so they can't go on the line. Give one a date and it takes its place.</p>
-      <div class="list">${undated.map(ev => `<div class="row-card"><a href="#/ev/${ev.id}"><b>⏳ ${esc(ev.title)}</b></a>
+      <div class="list">${undated.map(ev => `<div class="row-card"><a href="#/e/${ev.entry}"><b>⏳ ${esc(ev.title)}</b></a>
         ${ev.body ? `<small>${esc(plainLinks(ev.body).slice(0, 100))}</small>` : ""}<span class="spacer"></span>
-        <button class="btn small" data-act="editEvent" data-id="${ev.id}">Give it a date</button></div>`).join("")}</div></section>` : ""}</div>`;
+        <button class="btn small" data-act="editEntry" data-id="${ev.entry}">Give it a date</button></div>`).join("")}</div></section>` : ""}</div>`;
 });
 ACT.tlFilter = el => { TL.q = el.value; rerender(); refocus(".page-h .search"); };
 ACT.tlFollow = el => { TL.follow = el.value; rerender(); };
@@ -97,51 +130,30 @@ ACT.setNow = () => modal({
   } }],
 });
 
-/* ── an event's page ── */
+/* an event's old address opens its codex entry */
 addRoute("ev", "timeline", id => {
   const ev = byId(DB.events, id);
   if (!ev) return `<div class="page">${empty("That event doesn't exist any more.")}</div>`;
-  const inv = (ev.involves || []).map(i => byId(DB.entries, i)).filter(Boolean);
-  const back = backlinks("ev", ev.id).filter(b => b.t !== "n");
-  return `<div class="page narrow" style="--c:${ev.color || "var(--accent)"}">
-    <div class="page-h"><div><div class="kind-line"><a href="#/timeline">⏳ Event</a></div><h2>${esc(ev.title)}</h2>
-      <div class="life">${esc(fmtDate(ev.date) || "Undated")}${ev.end ? " to " + esc(fmtDate(ev.end)) : ""}</div></div>
-      <div class="spacer"></div><button class="btn accent" data-act="editEvent" data-id="${ev.id}">Edit</button>
-      <button class="btn ghost" data-act="deleteEvent" data-id="${ev.id}">🗑</button></div>
-    ${inv.length ? `<div class="chips">${inv.map(e => chip("e", e, ev.date ? `<small>${ageNote(e, ev.date).replace(" · ", " ")}</small>` : "")).join("")}</div>` : ""}
-    ${mdBlock(ev.body, empty("Nothing written about it yet."))}
-    ${tagsHtml(ev.tags)}
-    ${notesPanel("ev", ev.id)}
-    ${back.length ? `<section class="panel"><div class="panel-h"><h4>Mentioned in</h4></div><div class="chips">${back.map(b => chip(b.t, b.it)).join("")}</div></section>` : ""}
-  </div>`;
+  return [`<div class="page">${empty("Opening…")}</div>`, () => location.replace("#/e/" + ev.entry)];
 });
-function eventEditor(ev, isNew) {
-  modal({
-    title: isNew ? "New event" : "Edit event", wide: true,
-    body: `${textField("What happened", "title", ev.title, "autofocus")}
-      <div class="row2">${dateField("When", "date", ev.date)}${dateField("Until (optional)", "end", ev.end)}</div>
-      ${multiPick("Who and where", "involves", ev.involves || [])}
-      ${areaField("What happened, in full ([[links]] work)", "body", ev.body, 8)}
-      <div class="row2">${textField("Tags", "tags", (ev.tags || []).join(", "))}${colorField("Colour", "color", ev.color)}</div>`,
-    buttons: [{ label: "Cancel" }, { label: isNew ? "Create" : "Save", cls: "accent", act: w => {
-      const v = formVals(w);
-      if (!v.title.trim()) { toast("Give it a title"); return false; }
-      for (const n of ["date", "end"]) if (v[n].trim() && !parseDate(v[n])) { toast(`“${v[n]}” isn't a date I can read`); return false; }
-      Object.assign(ev, { title: v.title.trim(), date: parseDate(v.date), end: parseDate(v.end), involves: multiVals(v.involves), body: v.body, tags: splitList(v.tags), color: v.color });
-      if (isNew) DB.events.push(ev);
-      commit();
-      if (isNew) go("#/ev/" + ev.id);
-    } }],
-  });
-}
-const newEventObj = (p = {}) => ({ id: uid(), title: "", date: null, end: null, involves: [], body: "", tags: [], color: "", ...p });
-ACT.newEvent = () => eventEditor(newEventObj({ involves: TL.follow ? [TL.follow] : [] }), true);
-ACT.editEvent = el => eventEditor(byId(DB.events, el.dataset.id), false);
-ACT.deleteEvent = async el => {
-  const ev = byId(DB.events, el.dataset.id);
-  if (!await ask(`Delete “${ev.title}”?`, "You can undo this straight afterwards.")) return;
-  withUndo("Event deleted", () => { DB.events = DB.events.filter(x => x !== ev); });
-  go("#/timeline");
+// a new event is a new Event entry; it's on the timeline as soon as it's saved
+const newEventEntry = (p = {}) => {
+  const k = byId(DB.kinds, "event"), inv = k?.fields.find(f => norm(f.name) === "involved")?.id;
+  return newEntry({ kind: "event", ...(TL.follow && inv ? { fields: { [inv]: [TL.follow] } } : {}), ...p });
 };
-NEW_FROM_LINK.event = { label: "⏳ Timeline event", make: title => eventEditor(newEventObj({ title }), true) };
+ACT.newEvent = () => entryEditor(newEventEntry(), true);
+ACT.editEvent = el => { const ev = byId(DB.events, el.dataset.id); if (ev) entryEditor(evEntry(ev), false); };
+NEW_FROM_LINK.event = { label: "⏳ Timeline event", make: title => entryEditor(newEventEntry({ name: title }), true) };
+// an event's page in the codex: where it sits on the timeline, and the scenes that show it
+ENTITY_PANELS.push(e => {
+  const ev = DB.events.find(x => x.entry === e.id);
+  if (!ev) return "";
+  const scenes = allScenes().filter(x => (x.sc.events || []).includes(ev.id));
+  return `<section class="panel"><div class="panel-h"><h4>⏳ On the timeline</h4><a class="btn small" href="#/timeline" data-act="tlShowEvent" data-id="${ev.id}">See it on the timeline →</a></div>
+    <p class="muted small">${ev.date ? esc(fmtDate(ev.date)) + (ev.end ? " to " + esc(fmtDate(ev.end)) : "") : "Not dated yet: give it a date (Edit) and it takes its place on the line."}</p>
+    ${scenes.length ? `<h5>Shown in the story</h5><div class="chips">${scenes.map(x => chip("sc", x.sc)).join("")}</div>` : ""}</section>`;
+});
+ACT.tlShowEvent = el => { TL.follow = ""; TL.q = byId(DB.events, el.dataset.id)?.title || ""; go("#/timeline"); };
+// deleting an Event entry takes it off the timeline
+ENTITY_DELETE_HOOKS.push(id => { DB.events = DB.events.filter(ev => ev.entry !== id); });
 ENTITY_DELETE_HOOKS.push(id => { for (const ev of DB.events) ev.involves = (ev.involves || []).filter(x => x !== id); });

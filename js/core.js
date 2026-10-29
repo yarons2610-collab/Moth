@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-10-26";
+const APP_VERSION = "2026-10-29";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -50,6 +50,7 @@ function defaultKinds() {
     k("language", "Language", "🗣️", "#5fc9c4", "First spoken", "Last spoken"),
     k("culture", "Culture", "🎭", "#e58fb0", "Emerged", "Faded"),
     k("creature", "Creature", "🐉", "#f2a6c8", "First seen", "Gone"),
+    k("event", "Event", "⏳", "#c9b27a", "When", "Until"),
   ];
 }
 
@@ -59,8 +60,9 @@ function normalizeDB(d) {
   d.world = Object.assign({ name: "Untitled world", eras: [{ id: uid(), name: "First Age", abbr: "FA", start: 1 }], months: [], now: { y: 1 } }, d.world || {});
   if (!d.world.eras.length) d.world.eras = [{ id: uid(), name: "Age", abbr: "", start: 1 }];
   for (const k of DB_ARRAYS) if (!Array.isArray(d[k])) d[k] = [];
-  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 4; }
+  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 5; }
   upgradeKinds(d);
+  if (typeof syncEvents === "function") syncEvents(d);
   d.party ??= null;
   d.combat ??= null;
   d.updated ??= 0;
@@ -77,6 +79,7 @@ function loadDB() {
 // opts.quiet: keep the page as is (the writing view saves on every keystroke)
 function save(opts = {}) {
   DB.updated = Date.now();
+  if (typeof syncEvents === "function") syncEvents(DB);
   try { localStorage.setItem(DB_KEY, JSON.stringify(DB)); }
   catch (e) { toast("Couldn't save on this device: " + e.message); }
   IDX = null;

@@ -115,6 +115,12 @@ const KIND_TEMPLATES = {
     ["Others", "Allies", "links"], ["Others", "Rivals", "links"], ["Others", "How they see outsiders", "long"], ["Others", "How outsiders see them", "long"],
     ["Secrets", "Secrets", "long!"],
   ],
+  event: [
+    ["", "Type", "choice", "Battle|War|Disaster|Founding|Fall|Coronation|Death|Birth|Treaty|Discovery|Miracle|Festival|Prophecy|Other"],
+    ["", "Involved", "links"], ["", "Where", "link"], ["", "Known as", "text"],
+    ["What happened", "Causes", "long"], ["What happened", "Consequences", "long"], ["What happened", "Who remembers it, and how", "long"],
+    ["Secrets", "What really happened", "long!"],
+  ],
   creature: [
     ["", "Type", "text"], ["", "Habitat", "text"], ["", "Size", "choice", "Tiny|Small|Medium|Large|Huge|Gargantuan"],
     ["", "Danger", "choice", "Harmless|Low|Moderate|High|Deadly"], ["", "Lifespan", "text"], ["", "Diet", "text"],
@@ -142,10 +148,10 @@ function upgradeKinds(db) {
   // version 2 brought Religion and Deity; a world that already has kinds by
   // those names keeps its own
   // version 3, magic systems and spells
-  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"], 4: ["language", "culture"] };
+  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"], 4: ["language", "culture"], 5: ["event"] };
   for (const [ver, ids] of Object.entries(added)) if (v < +ver)
     for (const k of defaultKinds().filter(k => ids.includes(k.id))) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
-  db.fieldsV = 4;
+  db.fieldsV = 5;
 }
 
 // sections in the order their first field comes (the unnamed one too)
