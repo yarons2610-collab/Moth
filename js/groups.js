@@ -14,7 +14,10 @@
    knot, or being made on the knots board, makes someone one. Factions have
    nothing to do with it. */
 
-const GRP = { q: "", type: "", board: "faction" };
+const GRP = { q: "", type: "", board: "faction", sort: "num" };
+try { GRP.sort = localStorage.getItem("moth_knot_sort") || "num"; } catch {}
+// how the knots board can be ordered
+const KNOT_SORTS = { num: "Number, ascending", numdown: "Number, descending", status: "Status", score: "Score, highest first", name: "Name, A to Z" };
 const fieldNamed = (k, names, types) => k?.fields.find(f => names.includes(norm(f.name)) && (!types || types.includes(f.type)));
 function groupFields(kindId = GRP.board) {
   const fk = byId(DB.kinds, kindId), ck = byId(DB.kinds, "character"), knot = kindId === "knot";
@@ -90,6 +93,21 @@ const participantField = () => byId(DB.kinds, "character")?.fields.find(f => nor
 const isParticipant = e => { const f = participantField(); return !!(f && e.fields?.[f.id]); };
 function markParticipant(e) { const f = participantField(); if (f && e && e.kind === "character" && !e.fields?.[f.id]) { (e.fields ||= {})[f.id] = true; e.updated = Date.now(); } }
 
+function knotSorter(G, numOf) {
+  const byNum = (a, b) => numOf(a) - numOf(b) || a.name.localeCompare(b.name);
+  const sf = fieldNamed(G.fk, ["score"]), st = G.type;
+  const val = (e, f) => f ? e.fields?.[f.id] : undefined;
+  switch (GRP.sort) {
+    case "numdown": return (a, b) => -byNum(a, b);
+    case "name": return (a, b) => a.name.localeCompare(b.name);
+    // in the order the status choices are listed (change it in the Knot kind), then by number
+    case "status": { const rank = e => { const v = val(e, st); const i = (st?.opts || []).indexOf(v); return v ? (i < 0 ? 900 : i) : 999; }; return (a, b) => rank(a) - rank(b) || byNum(a, b); }
+    case "score": { const sc = e => { const n = parseFloat(val(e, sf)); return isNaN(n) ? -Infinity : n; }; return (a, b) => sc(b) - sc(a) || byNum(a, b); }
+    default: return byNum;
+  }
+}
+ACT.knotSort = el => { GRP.sort = el.value; try { localStorage.setItem("moth_knot_sort", GRP.sort); } catch {} rerender(); };
+
 addRoute("groups", "web", board => {
   if (board !== undefined) GRP.board = board === "knot" ? "knot" : "faction";
   if (GRP.lastBoard !== GRP.board) { GRP.type = ""; GRP.lastBoard = GRP.board; }
@@ -100,7 +118,7 @@ addRoute("groups", "web", board => {
   const types = G.type ? [...new Set(DB.entries.filter(e => e.kind === G.fk.id).map(e => e.fields?.[G.type.id]).filter(Boolean))].sort() : [];
   const numOf = e => { const v = G.num && e.fields?.[G.num.id]; const n = parseFloat(v ?? String(e.name).match(/\d+/)?.[0]); return isNaN(n) ? Infinity : n; };
   const facs = DB.entries.filter(e => e.kind === G.fk.id && (!GRP.type || e.fields?.[G.type.id] === GRP.type))
-    .sort((a, b) => G.knot ? numOf(a) - numOf(b) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
+    .sort(G.knot ? knotSorter(G, numOf) : (a, b) => a.name.localeCompare(b.name));
   const all = DB.entries.filter(e => e.kind === G.ck.id).sort((a, b) => a.name.localeCompare(b.name));
   // "not in any": of the groups shown now (all of them, or one kind)
   const inSome = new Set(facs.flatMap(f => groupMembers(f, G).map(m => m.e.id)));
@@ -117,6 +135,7 @@ addRoute("groups", "web", board => {
   return [`<div class="page wide groups-page">${webTabs("groups")}
     <div class="page-h"><h2>${G.knot ? "Knots" : "Groups"}</h2>${boards}<div class="spacer"></div>
       ${searchBox("grpFilter", GRP.q, "Find a character…")}
+      ${G.knot ? `<label class="inline">Order <select data-change="knotSort">${Object.entries(KNOT_SORTS).map(([k, l]) => `<option value="${k}" ${k === GRP.sort ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       ${types.length ? `<select data-change="grpType"><option value="">${G.knot ? "Every status" : "All kinds of group"}</option>${types.map(t => `<option ${t === GRP.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : ""}
       ${candidates.length ? `<button class="btn" data-act="knotConvert">Make some factions knots…</button>` : ""}
       <button class="btn accent" data-act="grpNew">+ New ${what}</button></div>

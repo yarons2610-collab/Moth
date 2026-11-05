@@ -122,7 +122,7 @@ const KIND_TEMPLATES = {
     ["Secrets", "What really happened", "long!"],
   ],
   knot: [
-    ["", "Number", "number"], ["", "Status", "choice", "Competing|Eliminated|Winner|Disbanded"], ["", "Score", "number"],
+    ["", "Number", "number"], ["", "Status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Score", "number"],
     ["", "Captain", "link"], ["", "Members", "links"],
     ["The competition", "Progress", "long"], ["The competition", "Rivals", "links"], ["The competition", "Strengths", "long"], ["The competition", "Weaknesses", "long"],
     ["Secrets", "Secrets", "long!"],
@@ -157,7 +157,12 @@ function upgradeKinds(db) {
   const added = { 2: ["religion", "deity"], 3: ["magic", "spell"], 4: ["language", "culture"], 5: ["event"], 6: ["knot"] };
   for (const [ver, ids] of Object.entries(added)) if (v < +ver)
     for (const k of defaultKinds().filter(k => ids.includes(k.id))) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
-  db.fieldsV = 6;
+  // version 7: knots can be disqualified
+  if (v < 7) {
+    const st = db.kinds.find(k => k.id === "knot")?.fields.find(f => norm(f.name) === "status" && f.type === "choice");
+    if (st && !(st.opts || []).some(o => norm(o) === "disqualified")) { const i = st.opts.findIndex(o => norm(o) === "eliminated"); st.opts.splice(i >= 0 ? i + 1 : st.opts.length, 0, "Disqualified"); }
+  }
+  db.fieldsV = 7;
 }
 
 // sections in the order their first field comes (the unnamed one too)
