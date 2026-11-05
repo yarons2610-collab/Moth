@@ -165,6 +165,7 @@ addRoute("codex", "codex", kind => {
   return `<div class="page">
     <div class="page-h"><h2>Codex</h2><div class="spacer"></div>
       ${searchBox("codexFilter", CODEX.q, "Filter the codex…")}
+      ${["character", "faction"].includes(CODEX.kind) ? `<a class="btn" href="#/groups">⚑ Groups board</a>` : ""}
       <button class="btn accent" data-act="newEntry" data-kind="${CODEX.kind}">+ New ${esc(CODEX.kind ? byId(DB.kinds, CODEX.kind)?.name || "entry" : "entry")}</button></div>
     <div class="chips-row">
       <a class="fchip ${!CODEX.kind ? "on" : ""}" href="#/codex/">All <small>${DB.entries.length}</small></a>
@@ -353,7 +354,8 @@ function kindFieldsHtml(kind, e) {
 const extraRow = (x = { name: "", value: "" }) => `<div class="extra-row"><input class="x-name" placeholder="Field" value="${esc(x.name)}"><textarea class="x-value" rows="2" placeholder="What it says">${esc(x.value)}</textarea><button type="button" class="mini" data-act="extraDel" title="Remove">✕</button></div>`;
 ACT.extraAdd = el => el.insertAdjacentHTML("beforebegin", extraRow());
 ACT.extraDel = el => el.closest(".extra-row").remove();
-function entryEditor(e, isNew) {
+// opts.after(e): what to do once a new entry is saved (default: open its page)
+function entryEditor(e, isNew, opts = {}) {
   const s = e.stats || {};
   modal({
     title: isNew ? "New entry" : "Edit " + e.name, wide: true,
@@ -398,6 +400,7 @@ function entryEditor(e, isNew) {
         for (const n of ["speed", "level", "block"]) if (v[n].trim()) st[n] = v[n].trim();
         e.stats = Object.keys(st).length ? st : null;
         if (isNew) DB.entries.push(e);
+        if (isNew && opts.after) { opts.after(e); return void commit(); }
         commit();
         if (isNew) go("#/e/" + e.id);
       },
