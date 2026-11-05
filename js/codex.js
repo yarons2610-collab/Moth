@@ -165,7 +165,7 @@ addRoute("codex", "codex", kind => {
   return `<div class="page">
     <div class="page-h"><h2>Codex</h2><div class="spacer"></div>
       ${searchBox("codexFilter", CODEX.q, "Filter the codex…")}
-      ${["character", "faction"].includes(CODEX.kind) ? `<a class="btn" href="#/groups">⚑ Groups board</a>` : ""}
+      ${["character", "faction"].includes(CODEX.kind) ? `<a class="btn" href="#/groups">⚑ Groups board</a>` : ""}${["character", "knot"].includes(CODEX.kind) ? `<a class="btn" href="#/groups/knot">⚔ Knots board</a>` : ""}
       <button class="btn accent" data-act="newEntry" data-kind="${CODEX.kind}">+ New ${esc(CODEX.kind ? byId(DB.kinds, CODEX.kind)?.name || "entry" : "entry")}</button></div>
     <div class="chips-row">
       <a class="fchip ${!CODEX.kind ? "on" : ""}" href="#/codex/">All <small>${DB.entries.length}</small></a>

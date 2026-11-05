@@ -4,7 +4,7 @@
    simulation. Family trees live under the same tab (family.js). */
 
 const WEB = { kinds: null, mentions: false, around: "", hops: 2, pos: {} };
-const webTabs = on => `<div class="subtabs"><a class="${on === "web" ? "on" : ""}" href="#/web">Relationship web</a><a class="${on === "family" ? "on" : ""}" href="#/family">Family trees</a><a class="${on === "groups" ? "on" : ""}" href="#/groups">Groups</a></div>`;
+const webTabs = on => `<div class="subtabs"><a class="${on === "web" ? "on" : ""}" href="#/web">Relationship web</a><a class="${on === "family" ? "on" : ""}" href="#/family">Family trees</a><a class="${on === "groups" ? "on" : ""}" href="#/groups">Groups & knots</a></div>`;
 
 function webGraph() {
   const kinds = WEB.kinds || new Set(DB.kinds.map(k => k.id));

@@ -918,3 +918,10 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .g-lifted { opacity: .35; }
 .g-pick { display: flex; flex-direction: column; gap: 2px; max-height: 55vh; overflow: auto; margin-top: 8px; }
 .g-pick label { padding: 4px 2px; }
+
+.board-seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 9px; overflow: hidden; margin-left: 10px; }
+.board-seg a { padding: 5px 12px; color: var(--ink-dim); font-size: 13.5px; }
+.board-seg a.on { background: var(--accent); color: #1a1410; }
+.board-seg a:hover { text-decoration: none; }
+.gcol-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: -4px; }
+.gcol-meta .pill { font-size: 11.5px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line2); color: var(--ink-dim); }

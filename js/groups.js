@@ -1,28 +1,36 @@
 "use strict";
-/* ── groups ── one board with every faction and who's in it, to see the
-   groups at a glance and put characters in them.
+/* ── groups ── a board with every group and who's in it, to see them at a
+   glance and put characters in them. Two boards: factions (kingdoms,
+   guilds…) and knots (the numbered groups of the competition).
 
-   Who's in a group comes from what the codex already says: the faction's
-   Leader and its Notable members (or Members) field, and each character's
-   Allegiance. Adding someone puts them in the faction's members list;
-   removing someone takes them off whatever put them there (members list,
-   allegiance, leader). Nothing else in either entry changes. */
+   Who's in a group comes from what the codex already says: its Leader or
+   Captain, its Notable members or Members field, and, for factions, each
+   character's Allegiance. Adding someone puts them in the group's members
+   list; removing someone takes them off whatever put them there. Nothing
+   else in either entry changes.
 
-const GRP = { q: "", type: "" };
+   Participant (a yes/no on characters) is about the competition only: the
+   knots board's "not in any knot" column lists participants, and joining a
+   knot, or being made on the knots board, makes someone one. Factions have
+   nothing to do with it. */
+
+const GRP = { q: "", type: "", board: "faction" };
 const fieldNamed = (k, names, types) => k?.fields.find(f => names.includes(norm(f.name)) && (!types || types.includes(f.type)));
-function groupFields() {
-  const fk = byId(DB.kinds, "faction"), ck = byId(DB.kinds, "character");
+function groupFields(kindId = GRP.board) {
+  const fk = byId(DB.kinds, kindId), ck = byId(DB.kinds, "character"), knot = kindId === "knot";
   return {
-    fk, ck,
-    mem: fieldNamed(fk, ["notable members", "members"], ["links"]),
-    lead: fieldNamed(fk, ["leader", "leaders"], ["link", "links"]),
-    alleg: fieldNamed(ck, ["allegiance", "allegiances", "faction", "factions"], ["link", "links"]),
-    type: fieldNamed(fk, ["type"], ["choice", "text"]),
+    fk, ck, knot,
+    mem: fieldNamed(fk, ["members", "notable members"], ["links"]),
+    lead: fieldNamed(fk, ["captain", "leader", "leaders"], ["link", "links"]),
+    alleg: knot ? null : fieldNamed(ck, ["allegiance", "allegiances", "faction", "factions"], ["link", "links"]),
+    type: fieldNamed(fk, knot ? ["status"] : ["type"], ["choice", "text"]),
+    num: knot ? fieldNamed(fk, ["number"], ["number", "text"]) : null,
   };
 }
 const asList = v => Array.isArray(v) ? v : v ? [v] : [];
+const groupKindOf = fac => fac?.kind === "knot" ? "knot" : "faction";
 // a group's members, each with what puts them there
-function groupMembers(fac, G = groupFields()) {
+function groupMembers(fac, G = groupFields(groupKindOf(fac))) {
   const out = new Map();
   const add = (id, why) => { const e = byId(DB.entries, id); if (!e || e.id === fac.id) return; (out.get(id) || out.set(id, { e, why: new Set() }).get(id)).why.add(why); };
   if (G.lead) for (const id of asList(fac.fields?.[G.lead.id])) add(id, "leader");
@@ -30,14 +38,15 @@ function groupMembers(fac, G = groupFields()) {
   if (G.alleg) for (const e of DB.entries) if (e.kind === G.ck?.id && asList(e.fields?.[G.alleg.id]).includes(fac.id)) add(e.id, "allegiance");
   return [...out.values()].sort((a, b) => (b.why.has("leader") - a.why.has("leader")) || a.e.name.localeCompare(b.e.name));
 }
-// a faction without a members field gets one (Structure → Members) the first time it's needed
+// a kind without a members field gets one (Members) the first time it's needed
 function membersField(G) {
   if (G.mem) return G.mem;
-  const f = { id: uid(), name: "Members", type: "links", sec: "Structure" };
+  const f = { id: uid(), name: "Members", type: "links", sec: G.knot ? "" : "Structure" };
   G.fk.fields.push(f);
   return (G.mem = f);
 }
-function joinGroup(charId, fac, G = groupFields()) {
+function joinGroup(charId, fac, G = groupFields(groupKindOf(fac))) {
+  if (G.knot) markParticipant(byId(DB.entries, charId));
   if (groupMembers(fac, G).some(m => m.e.id === charId)) return false;
   const f = membersField(G);
   fac.fields ||= {};
@@ -45,7 +54,7 @@ function joinGroup(charId, fac, G = groupFields()) {
   fac.updated = Date.now();
   return true;
 }
-function leaveGroup(charId, fac, G = groupFields()) {
+function leaveGroup(charId, fac, G = groupFields(groupKindOf(fac))) {
   const c = byId(DB.entries, charId);
   for (const f of [G.mem, G.lead]) if (f && fac.fields?.[f.id] != null) {
     const v = fac.fields[f.id];
@@ -61,42 +70,74 @@ function leaveGroup(charId, fac, G = groupFields()) {
   fac.updated = Date.now();
 }
 
-addRoute("groups", "web", () => {
+/* the Participant field: made once (beside Role), and everyone already in a
+   knot is one */
+function ensureParticipants(db = DB) {
+  const ck = db.kinds.find(k => k.id === "character"), kk = db.kinds.find(k => k.id === "knot");
+  if (!ck) return;
+  let f = ck.fields.find(x => norm(x.name) === "participant");
+  if (f) return;
+  const role = ck.fields.findIndex(x => norm(x.name) === "role");
+  f = { id: uid(), name: "Participant", type: "yesno", sec: role >= 0 ? ck.fields[role].sec || "" : "In the story" };
+  ck.fields.splice(role >= 0 ? role + 1 : ck.fields.length, 0, f);
+  if (!kk) return;
+  const named = names => kk.fields.find(x => names.includes(norm(x.name)) && ["link", "links"].includes(x.type));
+  const ids = new Set();
+  for (const e of db.entries) if (e.kind === "knot") for (const x of [named(["members", "notable members"]), named(["captain", "leader"])]) if (x) asList(e.fields?.[x.id]).forEach(id => ids.add(id));
+  for (const e of db.entries) if (e.kind === ck.id && ids.has(e.id)) (e.fields ||= {})[f.id] = true;
+}
+const participantField = () => byId(DB.kinds, "character")?.fields.find(f => norm(f.name) === "participant");
+const isParticipant = e => { const f = participantField(); return !!(f && e.fields?.[f.id]); };
+function markParticipant(e) { const f = participantField(); if (f && e && e.kind === "character" && !e.fields?.[f.id]) { (e.fields ||= {})[f.id] = true; e.updated = Date.now(); } }
+
+addRoute("groups", "web", board => {
+  if (board !== undefined) GRP.board = board === "knot" ? "knot" : "faction";
+  if (GRP.lastBoard !== GRP.board) { GRP.type = ""; GRP.lastBoard = GRP.board; }
   const G = groupFields();
-  if (!G.fk || !G.ck) return `<div class="page">${webTabs("groups")}${empty("Groups need the Faction and Character kinds.")}</div>`;
+  const boards = `<div class="seg board-seg"><a class="${G.knot ? "" : "on"}" href="#/groups/faction">⚑ Factions</a><a class="${G.knot ? "on" : ""}" href="#/groups/knot">⚔ Knots</a></div>`;
+  if (!G.fk || !G.ck) return `<div class="page">${webTabs("groups")}${boards}${empty("This board needs the Character kind and the " + (G.knot ? "Knot" : "Faction") + " kind.")}</div>`;
   const q = norm(GRP.q);
   const types = G.type ? [...new Set(DB.entries.filter(e => e.kind === G.fk.id).map(e => e.fields?.[G.type.id]).filter(Boolean))].sort() : [];
-  const facs = DB.entries.filter(e => e.kind === G.fk.id && (!GRP.type || e.fields?.[G.type.id] === GRP.type)).sort((a, b) => a.name.localeCompare(b.name));
+  const numOf = e => { const v = G.num && e.fields?.[G.num.id]; const n = parseFloat(v ?? String(e.name).match(/\d+/)?.[0]); return isNaN(n) ? Infinity : n; };
+  const facs = DB.entries.filter(e => e.kind === G.fk.id && (!GRP.type || e.fields?.[G.type.id] === GRP.type))
+    .sort((a, b) => G.knot ? numOf(a) - numOf(b) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
   const all = DB.entries.filter(e => e.kind === G.ck.id).sort((a, b) => a.name.localeCompare(b.name));
   // "not in any": of the groups shown now (all of them, or one kind)
   const inSome = new Set(facs.flatMap(f => groupMembers(f, G).map(m => m.e.id)));
   const match = e => !q || norm(e.name).includes(q) || (e.aliases || []).some(a => norm(a).includes(q));
-  const free = all.filter(e => !inSome.has(e.id) && match(e));
+  // on the knots board, only participants wait to be put in a knot
+  const free = all.filter(e => (!G.knot || isParticipant(e)) && !inSome.has(e.id) && match(e));
+  const others = G.knot ? all.filter(e => !isParticipant(e)).length : 0;
+  const what = G.knot ? "knot" : "group";
+  const candidates = G.knot ? DB.entries.filter(e => e.kind === "faction" && /^(knot|group)\s*#?\s*\d+\b/i.test(e.name.trim())) : [];
   const person = (e, fac, why) => `<span class="gchip" data-char="${e.id}" ${fac ? `data-from="${fac.id}"` : ""} style="--c:${entryColor(e)}" title="${esc(e.summary ? plainLinks(e.summary) : e.name)}">
     <span class="g-grip" aria-hidden="true">⠿</span><a href="#/e/${e.id}" draggable="false">${e.portrait ? assetImg(e.portrait, "g-pic") : `<span class="g-ic">${esc(initials(e.name))}</span>`}${esc(e.name)}</a>
-    ${why?.has("leader") ? `<small class="g-why" title="Leader">★</small>` : ""}${why && !why.has("member") && !why.has("leader") ? `<small class="g-why" title="Through their Allegiance">⚑</small>` : ""}
+    ${why?.has("leader") ? `<small class="g-why" title="${G.knot ? "Captain" : "Leader"}">★</small>` : ""}${why && !why.has("member") && !why.has("leader") ? `<small class="g-why" title="Through their Allegiance">⚑</small>` : ""}
     ${fac ? `<button class="mini" data-act="grpLeave" data-char="${e.id}" data-fac="${fac.id}" title="Take ${esc(e.name)} out of ${esc(fac.name)}">✕</button>` : ""}</span>`;
   return [`<div class="page wide groups-page">${webTabs("groups")}
-    <div class="page-h"><h2>Groups</h2><div class="spacer"></div>
+    <div class="page-h"><h2>${G.knot ? "Knots" : "Groups"}</h2>${boards}<div class="spacer"></div>
       ${searchBox("grpFilter", GRP.q, "Find a character…")}
-      ${types.length ? `<select data-change="grpType"><option value="">All kinds of group</option>${types.map(t => `<option ${t === GRP.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : ""}
-      <button class="btn accent" data-act="newEntry" data-kind="${G.fk.id}">+ New group</button></div>
-    <p class="muted small">Drag a character onto a group to add them (drag from one group to another to move them, holding Ctrl or ⌘ to add them to both), or use + Add. ★ leads the group; ⚑ is there through their own Allegiance.</p>
+      ${types.length ? `<select data-change="grpType"><option value="">${G.knot ? "Every status" : "All kinds of group"}</option>${types.map(t => `<option ${t === GRP.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : ""}
+      ${candidates.length ? `<button class="btn" data-act="knotConvert">Make some factions knots…</button>` : ""}
+      <button class="btn accent" data-act="grpNew">+ New ${what}</button></div>
+    <p class="muted small">Drag a character onto a ${what} to add them (from one ${what} to another to move them; hold Ctrl or ⌘ to add them to both), or use + Add. ★ ${G.knot ? "captains the knot" : "leads the group; ⚑ is there through their own Allegiance"}.${G.knot ? " Everyone in a knot is a participant in the competition." : ""}</p>
     <div class="groups-board">
       <section class="gcol free" data-fac="">
-        <div class="gcol-h"><b>${GRP.type ? `Not in any ${esc(GRP.type.toLowerCase())}` : "Not in any group"}</b><small>${free.length}</small></div>
-        <div class="gcol-list">${free.map(e => person(e)).join("") || `<p class="muted small">${q ? "No one by that name." : "Everyone belongs somewhere."}</p>`}</div>
-        <button class="btn small ghost" data-act="grpNewChar" data-fac="">+ New character</button>
+        <div class="gcol-h"><b>${G.knot ? (GRP.type ? `Participants not in a ${esc(GRP.type.toLowerCase())} knot` : "Participants not in a knot") : GRP.type ? `Not in any ${esc(GRP.type.toLowerCase())}` : "Not in any group"}</b><small>${free.length}</small></div>
+        <div class="gcol-list">${free.map(e => person(e)).join("") || `<p class="muted small">${q ? "No one by that name." : G.knot ? "Every participant is in a knot." : "Everyone belongs somewhere."}</p>`}</div>
+        ${G.knot ? `<p class="muted small">Only participants are listed${others ? `; ${plural(others, "other character")} aren't (+ Add on a knot lists everyone, or tick Participant on a character's page)` : ""}.</p>` : ""}
+        <button class="btn small ghost" data-act="grpNewChar" data-fac="">+ New ${G.knot ? "participant" : "character"}</button>
       </section>
       ${facs.map(f => {
         const ms = groupMembers(f, G).filter(m => match(m.e) || !q);
         return `<section class="gcol" data-fac="${f.id}" style="--c:${entryColor(f)}">
           <div class="gcol-h"><a href="#/e/${f.id}">${f.portrait ? assetImg(f.portrait, "g-pic") : `<span>${kindOf(f).icon}</span>`} <b>${esc(f.name)}</b></a><small>${ms.length}</small></div>
+          ${G.knot && (G.type && f.fields?.[G.type.id] || f.fields?.[fieldNamed(G.fk, ["score"])?.id] != null) ? `<div class="gcol-meta">${G.type && f.fields?.[G.type.id] ? `<span class="pill">${esc(f.fields[G.type.id])}</span>` : ""}${(() => { const sf = fieldNamed(G.fk, ["score"]); return sf && f.fields?.[sf.id] != null ? `<span class="pill">Score ${esc(f.fields[sf.id])}</span>` : ""; })()}</div>` : ""}
           ${f.summary ? `<p class="gcol-sum">${esc(plainLinks(f.summary))}</p>` : ""}
           <div class="gcol-list">${ms.map(m => person(m.e, f, m.why)).join("") || `<p class="muted small">No members yet.</p>`}</div>
-          <div class="gcol-f"><button class="btn small" data-act="grpPick" data-fac="${f.id}">+ Add</button><button class="btn small ghost" data-act="grpNewChar" data-fac="${f.id}">+ New character</button></div>
+          <div class="gcol-f"><button class="btn small" data-act="grpPick" data-fac="${f.id}">+ Add</button><button class="btn small ghost" data-act="grpNewChar" data-fac="${f.id}">+ New ${G.knot ? "participant" : "character"}</button></div>
         </section>`;
-      }).join("") || empty("No factions yet: + New group.")}
+      }).join("") || empty(G.knot ? "No knots yet: + New knot" + (candidates.length ? ", or make some of your factions knots." : ".") : "No factions yet: + New group.")}
     </div></div>`, wireGroupDrag];
 });
 ACT.grpFilter = el => { GRP.q = el.value; rerender(); refocus(".groups-page .page-h .search"); };
@@ -127,10 +168,57 @@ ACT.grpPick = el => {
     } }] });
 };
 ACT.grpPickFilter = el => { const q = norm(el.value); for (const l of $$(".g-pick label", el.closest(".modal"))) l.style.display = q && !l.dataset.name.includes(q) ? "none" : ""; };
-// a new character, already in the group
+// a new character, already in the group (on the knots board: a participant)
 ACT.grpNewChar = el => {
-  const G = groupFields(), fac = byId(DB.entries, el.dataset.fac);
-  entryEditor(newEntry({ kind: G.ck.id }), true, { after: e => { if (fac) joinGroup(e.id, fac, G); toast(fac ? `${e.name} joined ${fac.name}` : `${e.name} added`); } });
+  const G = groupFields(), fac = byId(DB.entries, el.dataset.fac), pf = G.knot && participantField();
+  entryEditor(newEntry({ kind: G.ck.id, fields: pf ? { [pf.id]: true } : {} }), true, { after: e => {
+    if (G.knot) markParticipant(e);
+    if (fac) joinGroup(e.id, fac, G);
+    toast(fac ? `${e.name} joined ${fac.name}` : `${e.name} added${G.knot ? " as a participant" : ""}`);
+  } });
+};
+// a new group; a new knot comes numbered
+ACT.grpNew = () => {
+  const G = groupFields();
+  if (!G.knot) return entryEditor(newEntry({ kind: G.fk.id }), true, { after: () => {} });
+  const nums = DB.entries.filter(e => e.kind === "knot").map(e => parseFloat(G.num && e.fields?.[G.num.id]) || parseFloat(e.name.match(/\d+/)?.[0])).filter(n => !isNaN(n));
+  const n = nums.length ? Math.max(...nums) + 1 : 1;
+  entryEditor(newEntry({ kind: "knot", name: "Knot " + n, fields: G.num ? { [G.num.id]: n } : {} }), true, { after: () => {} });
+};
+/* factions that are really knots become knots: the same entries, with their
+   members, captain and everything else kept (a faction field a knot doesn't
+   have is kept as one of the entry's own fields), and their members become
+   participants */
+ACT.knotConvert = () => {
+  const facs = DB.entries.filter(e => e.kind === "faction").sort((a, b) => a.name.localeCompare(b.name));
+  const guess = e => /^(knot|group)\s*#?\s*\d+\b/i.test(e.name.trim());
+  modal({ title: "Make some factions knots", wide: true,
+    body: `<p class="muted">Tick the factions that are knots of the competition. They stay the same entries, with everything in them; their members become participants. The numbered ones are ticked for you.</p>
+      <div class="g-pick">${facs.map(e => `<label class="check"><input type="checkbox" name="f_${e.id}" ${guess(e) ? "checked" : ""}> ${esc(e.name)}${e.summary ? ` <small class="muted">${esc(plainLinks(e.summary).slice(0, 70))}</small>` : ""}</label>`).join("")}</div>`,
+    buttons: [{ label: "Cancel" }, { label: "Make them knots", cls: "accent", act: w => {
+      const v = formVals(w), pick = facs.filter(e => v["f_" + e.id]);
+      if (!pick.length) return;
+      const snap = JSON.stringify(DB);
+      const fk = byId(DB.kinds, "faction"), kk = byId(DB.kinds, "knot");
+      const alias = { "notable members": "members", leader: "captain", leaders: "captain" };
+      const num = kk.fields.find(f => norm(f.name) === "number");
+      for (const e of pick) {
+        const out = {}, extra = [...(e.extra || [])];
+        for (const [fid, val] of Object.entries(e.fields || {})) {
+          const f = fk.fields.find(x => x.id === fid);
+          if (!f) { out[fid] = val; continue; }
+          const n = alias[norm(f.name)] || norm(f.name), to = kk.fields.find(x => norm(x.name) === n && (x.type === f.type || (["link", "links"].includes(x.type) && ["link", "links"].includes(f.type))));
+          if (to) out[to.id] = to.type === "links" && !Array.isArray(val) ? asList(val) : to.type === "link" && Array.isArray(val) ? val[0] : val;
+          else if (!isEmptyVal(val)) extra.push({ name: f.name, value: ["link", "links"].includes(f.type) ? asList(val).map(id => byId(DB.entries, id)?.name).filter(Boolean).map(n => `[[${n}]]`).join(", ") : f.type === "date" ? fmtDate(val) : f.type === "yesno" ? (val ? "Yes" : "No") : String(val) });
+        }
+        const n = parseFloat(e.name.match(/\d+/)?.[0]);
+        if (num && out[num.id] == null && !isNaN(n)) out[num.id] = n;
+        e.kind = "knot"; e.fields = out; e.extra = extra; e.updated = Date.now();
+        for (const m of groupMembers(e, groupFields("knot"))) markParticipant(m.e);
+      }
+      commit();
+      toast(`${plural(pick.length, "faction")} made knots`, { undo: () => { DB = normalizeDB(JSON.parse(snap)); commit(); } });
+    } }] });
 };
 
 /* dragging a character onto a group: with a mouse or pen (on a touch

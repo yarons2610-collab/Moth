@@ -24,7 +24,7 @@ const KIND_TEMPLATES = {
     ["Personality", "Fears", "text"], ["Personality", "Mannerisms", "text"], ["Personality", "Voice and speech", "text"], ["Personality", "Quotes", "list"],
     ["Background", "Upbringing", "long"], ["Background", "Education and training", "text"], ["Background", "Turning points", "long"],
     ["Abilities", "Skills", "list"], ["Abilities", "Talents and magic", "long"], ["Abilities", "Weaknesses", "text"], ["Abilities", "Possessions", "links"],
-    ["In the story", "Role", "choice", "Protagonist|Deuteragonist|Antagonist|Love interest|Mentor|Rival|Foil|Ally|Supporting|Minor|Background"],
+    ["In the story", "Role", "choice", "Protagonist|Deuteragonist|Antagonist|Love interest|Mentor|Rival|Foil|Ally|Supporting|Minor|Background"], ["In the story", "Participant", "yesno"],
     ["In the story", "Wants", "long"], ["In the story", "Needs", "long"], ["In the story", "Arc", "long"], ["In the story", "Theme", "text"],
     ["Secrets", "Secrets", "long!"], ["Secrets", "What they'd never admit", "long!"],
   ],
@@ -121,6 +121,12 @@ const KIND_TEMPLATES = {
     ["What happened", "Causes", "long"], ["What happened", "Consequences", "long"], ["What happened", "Who remembers it, and how", "long"],
     ["Secrets", "What really happened", "long!"],
   ],
+  knot: [
+    ["", "Number", "number"], ["", "Status", "choice", "Competing|Eliminated|Winner|Disbanded"], ["", "Score", "number"],
+    ["", "Captain", "link"], ["", "Members", "links"],
+    ["The competition", "Progress", "long"], ["The competition", "Rivals", "links"], ["The competition", "Strengths", "long"], ["The competition", "Weaknesses", "long"],
+    ["Secrets", "Secrets", "long!"],
+  ],
   creature: [
     ["", "Type", "text"], ["", "Habitat", "text"], ["", "Size", "choice", "Tiny|Small|Medium|Large|Huge|Gargantuan"],
     ["", "Danger", "choice", "Harmless|Low|Moderate|High|Deadly"], ["", "Lifespan", "text"], ["", "Diet", "text"],
@@ -148,10 +154,10 @@ function upgradeKinds(db) {
   // version 2 brought Religion and Deity; a world that already has kinds by
   // those names keeps its own
   // version 3, magic systems and spells
-  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"], 4: ["language", "culture"], 5: ["event"] };
+  const added = { 2: ["religion", "deity"], 3: ["magic", "spell"], 4: ["language", "culture"], 5: ["event"], 6: ["knot"] };
   for (const [ver, ids] of Object.entries(added)) if (v < +ver)
     for (const k of defaultKinds().filter(k => ids.includes(k.id))) if (!db.kinds.some(x => x.id === k.id || norm(x.name) === norm(k.name))) db.kinds.push(k);
-  db.fieldsV = 5;
+  db.fieldsV = 6;
 }
 
 // sections in the order their first field comes (the unnamed one too)
