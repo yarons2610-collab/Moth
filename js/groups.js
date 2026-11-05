@@ -68,7 +68,8 @@ addRoute("groups", "web", () => {
   const types = G.type ? [...new Set(DB.entries.filter(e => e.kind === G.fk.id).map(e => e.fields?.[G.type.id]).filter(Boolean))].sort() : [];
   const facs = DB.entries.filter(e => e.kind === G.fk.id && (!GRP.type || e.fields?.[G.type.id] === GRP.type)).sort((a, b) => a.name.localeCompare(b.name));
   const all = DB.entries.filter(e => e.kind === G.ck.id).sort((a, b) => a.name.localeCompare(b.name));
-  const inSome = new Set(DB.entries.filter(e => e.kind === G.fk.id).flatMap(f => groupMembers(f, G).map(m => m.e.id)));
+  // "not in any": of the groups shown now (all of them, or one kind)
+  const inSome = new Set(facs.flatMap(f => groupMembers(f, G).map(m => m.e.id)));
   const match = e => !q || norm(e.name).includes(q) || (e.aliases || []).some(a => norm(a).includes(q));
   const free = all.filter(e => !inSome.has(e.id) && match(e));
   const person = (e, fac, why) => `<span class="gchip" data-char="${e.id}" ${fac ? `data-from="${fac.id}"` : ""} style="--c:${entryColor(e)}" title="${esc(e.summary ? plainLinks(e.summary) : e.name)}">
@@ -83,7 +84,7 @@ addRoute("groups", "web", () => {
     <p class="muted small">Drag a character onto a group to add them (drag from one group to another to move them, holding Ctrl or ⌘ to add them to both), or use + Add. ★ leads the group; ⚑ is there through their own Allegiance.</p>
     <div class="groups-board">
       <section class="gcol free" data-fac="">
-        <div class="gcol-h"><b>Not in any group</b><small>${free.length}</small></div>
+        <div class="gcol-h"><b>${GRP.type ? `Not in any ${esc(GRP.type.toLowerCase())}` : "Not in any group"}</b><small>${free.length}</small></div>
         <div class="gcol-list">${free.map(e => person(e)).join("") || `<p class="muted small">${q ? "No one by that name." : "Everyone belongs somewhere."}</p>`}</div>
         <button class="btn small ghost" data-act="grpNewChar" data-fac="">+ New character</button>
       </section>
