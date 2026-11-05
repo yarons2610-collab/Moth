@@ -17,7 +17,7 @@
 const GRP = { q: "", type: "", board: "faction", sort: "num" };
 try { GRP.sort = localStorage.getItem("moth_knot_sort") || "num"; } catch {}
 // how the knots board can be ordered
-const KNOT_SORTS = { num: "Number, ascending", numdown: "Number, descending", status: "Status", score: "Score, highest first", name: "Name, A to Z" };
+const KNOT_SORTS = { num: "Number, ascending", numdown: "Number, descending", status: "Current status", final: "Final status", score: "Score, highest first", name: "Name, A to Z" };
 const fieldNamed = (k, names, types) => k?.fields.find(f => names.includes(norm(f.name)) && (!types || types.includes(f.type)));
 function groupFields(kindId = GRP.board) {
   const fk = byId(DB.kinds, kindId), ck = byId(DB.kinds, "character"), knot = kindId === "knot";
@@ -26,7 +26,8 @@ function groupFields(kindId = GRP.board) {
     mem: fieldNamed(fk, ["members", "notable members"], ["links"]),
     lead: fieldNamed(fk, ["captain", "leader", "leaders"], ["link", "links"]),
     alleg: knot ? null : fieldNamed(ck, ["allegiance", "allegiances", "faction", "factions"], ["link", "links"]),
-    type: fieldNamed(fk, knot ? ["status"] : ["type"], ["choice", "text"]),
+    type: fieldNamed(fk, knot ? ["current status", "status"] : ["type"], ["choice", "text"]),
+    final: knot ? fieldNamed(fk, ["final status"], ["choice", "text"]) : null,
     num: knot ? fieldNamed(fk, ["number"], ["number", "text"]) : null,
   };
 }
@@ -101,7 +102,11 @@ function knotSorter(G, numOf) {
     case "numdown": return (a, b) => -byNum(a, b);
     case "name": return (a, b) => a.name.localeCompare(b.name);
     // in the order the status choices are listed (change it in the Knot kind), then by number
-    case "status": { const rank = e => { const v = val(e, st); const i = (st?.opts || []).indexOf(v); return v ? (i < 0 ? 900 : i) : 999; }; return (a, b) => rank(a) - rank(b) || byNum(a, b); }
+    case "status": case "final": {
+      const f = GRP.sort === "final" ? G.final : st;
+      const rank = e => { const v = val(e, f); const i = (f?.opts || []).indexOf(v); return v ? (i < 0 ? 900 : i) : 999; };
+      return (a, b) => rank(a) - rank(b) || byNum(a, b);
+    }
     case "score": { const sc = e => { const n = parseFloat(val(e, sf)); return isNaN(n) ? -Infinity : n; }; return (a, b) => sc(b) - sc(a) || byNum(a, b); }
     default: return byNum;
   }
@@ -136,7 +141,7 @@ addRoute("groups", "web", board => {
     <div class="page-h"><h2>${G.knot ? "Knots" : "Groups"}</h2>${boards}<div class="spacer"></div>
       ${searchBox("grpFilter", GRP.q, "Find a character…")}
       ${G.knot ? `<label class="inline">Order <select data-change="knotSort">${Object.entries(KNOT_SORTS).map(([k, l]) => `<option value="${k}" ${k === GRP.sort ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
-      ${types.length ? `<select data-change="grpType"><option value="">${G.knot ? "Every status" : "All kinds of group"}</option>${types.map(t => `<option ${t === GRP.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : ""}
+      ${types.length ? `<select data-change="grpType"><option value="">${G.knot ? "Every current status" : "All kinds of group"}</option>${types.map(t => `<option ${t === GRP.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : ""}
       ${candidates.length ? `<button class="btn" data-act="knotConvert">Make some factions knots…</button>` : ""}
       <button class="btn accent" data-act="grpNew">+ New ${what}</button></div>
     <p class="muted small">Drag a character onto a ${what} to add them (from one ${what} to another to move them; hold Ctrl or ⌘ to add them to both), or use + Add. ★ ${G.knot ? "captains the knot" : "leads the group; ⚑ is there through their own Allegiance"}.${G.knot ? " Everyone in a knot is a participant in the competition." : ""}</p>
@@ -151,7 +156,11 @@ addRoute("groups", "web", board => {
         const ms = groupMembers(f, G).filter(m => match(m.e) || !q);
         return `<section class="gcol" data-fac="${f.id}" style="--c:${entryColor(f)}">
           <div class="gcol-h"><a href="#/e/${f.id}">${f.portrait ? assetImg(f.portrait, "g-pic") : `<span>${kindOf(f).icon}</span>`} <b>${esc(f.name)}</b></a><small>${ms.length}</small></div>
-          ${G.knot && (G.type && f.fields?.[G.type.id] || f.fields?.[fieldNamed(G.fk, ["score"])?.id] != null) ? `<div class="gcol-meta">${G.type && f.fields?.[G.type.id] ? `<span class="pill">${esc(f.fields[G.type.id])}</span>` : ""}${(() => { const sf = fieldNamed(G.fk, ["score"]); return sf && f.fields?.[sf.id] != null ? `<span class="pill">Score ${esc(f.fields[sf.id])}</span>` : ""; })()}</div>` : ""}
+          ${G.knot ? (() => {
+            const sf = fieldNamed(G.fk, ["score"]), cur = G.type && f.fields?.[G.type.id], fin = G.final && f.fields?.[G.final.id], sc = sf && f.fields?.[sf.id];
+            const pills = [cur && `<span class="pill" title="Current status">${esc(cur)}</span>`, fin && `<span class="pill final" title="Final status">Final: ${esc(fin)}</span>`, sc != null && sc !== "" && `<span class="pill">Score ${esc(sc)}</span>`].filter(Boolean);
+            return pills.length ? `<div class="gcol-meta">${pills.join("")}</div>` : "";
+          })() : ""}
           ${f.summary ? `<p class="gcol-sum">${esc(plainLinks(f.summary))}</p>` : ""}
           <div class="gcol-list">${ms.map(m => person(m.e, f, m.why)).join("") || `<p class="muted small">No members yet.</p>`}</div>
           <div class="gcol-f"><button class="btn small" data-act="grpPick" data-fac="${f.id}">+ Add</button><button class="btn small ghost" data-act="grpNewChar" data-fac="${f.id}">+ New ${G.knot ? "participant" : "character"}</button></div>

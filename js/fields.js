@@ -122,7 +122,7 @@ const KIND_TEMPLATES = {
     ["Secrets", "What really happened", "long!"],
   ],
   knot: [
-    ["", "Number", "number"], ["", "Status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Score", "number"],
+    ["", "Number", "number"], ["", "Current status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Final status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Score", "number"],
     ["", "Captain", "link"], ["", "Members", "links"],
     ["The competition", "Progress", "long"], ["The competition", "Rivals", "links"], ["The competition", "Strengths", "long"], ["The competition", "Weaknesses", "long"],
     ["Secrets", "Secrets", "long!"],
@@ -162,7 +162,16 @@ function upgradeKinds(db) {
     const st = db.kinds.find(k => k.id === "knot")?.fields.find(f => norm(f.name) === "status" && f.type === "choice");
     if (st && !(st.opts || []).some(o => norm(o) === "disqualified")) { const i = st.opts.findIndex(o => norm(o) === "eliminated"); st.opts.splice(i >= 0 ? i + 1 : st.opts.length, 0, "Disqualified"); }
   }
-  db.fieldsV = 7;
+  // version 8: a knot's status is now its current status, beside a final one
+  if (v < 8) {
+    const kk = db.kinds.find(k => k.id === "knot");
+    const cur = kk?.fields.find(f => norm(f.name) === "current status") || kk?.fields.find(f => norm(f.name) === "status" && f.type === "choice");
+    if (cur) {
+      if (norm(cur.name) === "status") cur.name = "Current status";
+      if (!kk.fields.some(f => norm(f.name) === "final status")) kk.fields.splice(kk.fields.indexOf(cur) + 1, 0, { id: uid(), name: "Final status", type: "choice", sec: cur.sec || "", opts: [...(cur.opts || [])] });
+    }
+  }
+  db.fieldsV = 8;
 }
 
 // sections in the order their first field comes (the unnamed one too)

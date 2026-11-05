@@ -925,3 +925,4 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .board-seg a:hover { text-decoration: none; }
 .gcol-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: -4px; }
 .gcol-meta .pill { font-size: 11.5px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line2); color: var(--ink-dim); }
+.gcol-meta .pill.final { border-color: var(--accent); color: var(--ink); }
