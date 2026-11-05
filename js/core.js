@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-11-06c";
+const APP_VERSION = "2026-11-07b";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -61,7 +61,7 @@ function normalizeDB(d) {
   d.world = Object.assign({ name: "Untitled world", eras: [{ id: uid(), name: "First Age", abbr: "FA", start: 1 }], months: [], now: { y: 1 } }, d.world || {});
   if (!d.world.eras.length) d.world.eras = [{ id: uid(), name: "Age", abbr: "", start: 1 }];
   for (const k of DB_ARRAYS) if (!Array.isArray(d[k])) d[k] = [];
-  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 8; }
+  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 9; }
   upgradeKinds(d);
   if (typeof syncEvents === "function") syncEvents(d);
   if (typeof ensureParticipants === "function") ensureParticipants(d);
@@ -82,6 +82,7 @@ function loadDB() {
 function save(opts = {}) {
   DB.updated = Date.now();
   if (typeof syncEvents === "function") syncEvents(DB);
+  if (typeof soloCaptains === "function") soloCaptains(DB);
   try { localStorage.setItem(DB_KEY, JSON.stringify(DB)); }
   catch (e) { toast("Couldn't save on this device: " + e.message); }
   IDX = null;
@@ -272,6 +273,14 @@ const mdBlock = (src, empty = "") => src && String(src).trim() ? `<div class="pr
 const ROUTES = [];
 const addRoute = (prefix, tab, view) => ROUTES.push({ prefix, tab, view });
 let CUR = { prefix: "", args: [] };
+/* where you came from, for a "‹ Back to …" link: the page before this one,
+   by its heading, and how far down each page was scrolled */
+const NAV = { hash: "", title: "", prevHash: "", prevTitle: "", backing: false, scroll: {} };
+function backLink() {
+  if (typeof IN_SIDE !== "undefined" && IN_SIDE) return "";
+  if (!NAV.prevHash || NAV.prevHash === location.hash) return "";
+  return `<a class="back-link" href="${esc(NAV.prevHash)}" data-act="goBack">‹ Back to ${esc(NAV.prevTitle || "the last page")}</a>`;
+}
 function route() {
   const parts = (location.hash.replace(/^#\/?/, "") || "codex").split("/").map(p => decodeURIComponent(p));
   const r = ROUTES.find(x => x.prefix === parts[0]) || ROUTES.find(x => x.prefix === "codex");
@@ -279,6 +288,11 @@ function route() {
   $$(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === r.tab));
   document.body.dataset.route = r.prefix;
   const main = $("#main");
+  // a new page (not the same one redrawn): remember the one we're leaving
+  if (location.hash !== NAV.hash) {
+    if (NAV.hash) { NAV.prevHash = NAV.hash; NAV.prevTitle = NAV.title; }
+    NAV.hash = location.hash;
+  }
   let out;
   try { out = r.view(...CUR.args); }
   catch (e) { console.error(e); out = `<div class="page"><p class="empty">Something went wrong showing this page: ${esc(e.message)}</p></div>`; }
@@ -286,6 +300,7 @@ function route() {
   if (html != null) main.innerHTML = html;
   after?.(main);
   $("#worldName").textContent = DB.world.name;
+  NAV.title = (main.querySelector(".page-h h2, h2, h1")?.textContent || "").trim().replace(/\s+/g, " ").slice(0, 40);
   if (typeof renderSide === "function") renderSide();
   emit("route", CUR);
 }
@@ -308,6 +323,7 @@ const isTyping = el => /^(INPUT|TEXTAREA|SELECT)$/.test(el?.tagName) || !!el?.is
 /* ── actions ── data-act="name" on anything clickable runs ACT.name(el, event);
    data-change / data-input do the same for change and input events. */
 const ACT = {};
+ACT.goBack = () => { NAV.backing = true; history.back(); };
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
   if (!el || el.disabled) return;

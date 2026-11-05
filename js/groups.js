@@ -90,6 +90,68 @@ function ensureParticipants(db = DB) {
   for (const e of db.entries) if (e.kind === "knot") for (const x of [named(["members", "notable members"]), named(["captain", "leader"])]) if (x) asList(e.fields?.[x.id]).forEach(id => ids.add(id));
   for (const e of db.entries) if (e.kind === ck.id && ids.has(e.id)) (e.fields ||= {})[f.id] = true;
 }
+// a knot of one is captained by that one (unless it has a captain already)
+function soloCaptains(db = DB) {
+  const kk = db.kinds.find(k => k.id === "knot");
+  if (!kk) return;
+  const mem = kk.fields.find(f => ["members", "notable members"].includes(norm(f.name)) && f.type === "links");
+  const cap = kk.fields.find(f => ["captain", "leader"].includes(norm(f.name)) && ["link", "links"].includes(f.type));
+  if (!mem || !cap) return;
+  for (const e of db.entries) {
+    if (e.kind !== "knot" || asList(e.fields?.[cap.id]).length) continue;
+    const ms = asList(e.fields?.[mem.id]).filter(id => db.entries.some(x => x.id === id));
+    if (ms.length === 1) e.fields[cap.id] = cap.type === "links" ? [ms[0]] : ms[0];
+  }
+}
+/* what's shown beside a name on the board: ♂ / ♀ (from Gender, or else from
+   Pronouns), and the emoji of each of the three specialties */
+const SPECS = [["magical", "Magical"], ["martial", "Martial"], ["utility", "Utility"]];
+const specField = key => byId(DB.kinds, "character")?.fields.find(f => norm(f.name) === key + " specialty");
+function genderOf(e) {
+  const ck = byId(DB.kinds, "character"), f = ck?.fields.find(x => ["gender", "sex"].includes(norm(x.name)));
+  const v = norm(f && e.fields?.[f.id] || "");
+  if (/^(m|male|man|boy)$/.test(v)) return "m";
+  if (/^(f|female|woman|girl)$/.test(v)) return "f";
+  if (v) return "";
+  const pr = ck?.fields.find(x => norm(x.name) === "pronouns"), p = norm(pr && e.fields?.[pr.id] || "");
+  return /^he\b/.test(p) ? "m" : /^she\b/.test(p) ? "f" : "";
+}
+function charMarks(e) {
+  const g = genderOf(e);
+  const specs = SPECS.map(([k, label]) => { const f = specField(k), v = f && e.fields?.[f.id]; return v ? `<span class="g-spec" title="${label}: ${esc(v)}">${f.icons?.[v] || "•"}</span>` : ""; }).join("");
+  return `${g ? `<span class="g-sex ${g}" title="${g === "m" ? "Male" : "Female"}">${g === "m" ? "♂" : "♀"}</span>` : ""}${specs ? `<span class="g-specs">${specs}</span>` : ""}`;
+}
+// the three specialties' options, each with its emoji
+ACT.specManage = () => {
+  const row = (o = "", icon = "") => `<div class="spec-row" data-old="${esc(o)}">${emojiPicker(icon, { name: "", lazy: true, blank: "＋" })}<input class="spec-name" value="${esc(o)}" placeholder="e.g. Fire weaving"><button type="button" class="mini" data-act="specDel" title="Remove this option">✕</button></div>`;
+  modal({ title: "Specialties", wide: true,
+    body: `<p class="muted">Every character can have one specialty of each kind. Make the options here and give each an emoji: they show beside names on the knots board. Renaming an option renames it for everyone who has it.</p>
+      <div class="spec-cols">${SPECS.map(([k, label]) => { const f = specField(k); return `<section class="spec-col" data-k="${k}"><h4>${label}</h4>
+        <div class="spec-list">${(f?.opts || []).map(o => row(o, f.icons?.[o] || "")).join("")}</div>
+        <button type="button" class="btn small" data-act="specAdd">+ Option</button></section>`; }).join("")}</div>`,
+    onOpen: w => { w._row = row; },
+    buttons: [{ label: "Cancel" }, { label: "Save", cls: "accent", act: w => {
+      const snap = JSON.stringify(DB);
+      let renamed = 0, orphan = 0;
+      for (const [k] of SPECS) {
+        const f = specField(k);
+        if (!f) continue;
+        const rows = $$(`.spec-col[data-k="${k}"] .spec-row`, w).map(r => ({ old: r.dataset.old, name: $(".spec-name", r).value.trim(), icon: $(".icon-input", r).value.trim() })).filter(r => r.name);
+        const names = rows.map(r => r.name);
+        if (new Set(names.map(norm)).size !== names.length) { toast(`Two ${k} options have the same name`); return false; }
+        // renamed options follow everyone who has them
+        const map = new Map(rows.filter(r => r.old && r.old !== r.name).map(r => [r.old, r.name]));
+        for (const e of DB.entries) { const v = e.fields?.[f.id]; if (v && map.has(v)) { e.fields[f.id] = map.get(v); renamed++; } }
+        f.opts = names;
+        f.icons = Object.fromEntries(rows.filter(r => r.icon).map(r => [r.name, r.icon]));
+        orphan += DB.entries.filter(e => { const v = e.fields?.[f.id]; return v && !names.includes(v); }).length;
+      }
+      commit();
+      toast(["Specialties saved", renamed && `${plural(renamed, "character")} renamed with them`, orphan && `${plural(orphan, "character")} still have an option you removed (it stays on their page)`].filter(Boolean).join("; "), { undo: () => { DB = normalizeDB(JSON.parse(snap)); commit(); } });
+    } }] });
+};
+ACT.specAdd = el => { const w = el.closest(".modal-wrap"), list = $(".spec-list", el.closest(".spec-col")); list.insertAdjacentHTML("beforeend", w._row()); $$(".spec-name", list).pop().focus(); };
+ACT.specDel = el => el.closest(".spec-row").remove();
 const participantField = () => byId(DB.kinds, "character")?.fields.find(f => norm(f.name) === "participant");
 const isParticipant = e => { const f = participantField(); return !!(f && e.fields?.[f.id]); };
 function markParticipant(e) { const f = participantField(); if (f && e && e.kind === "character" && !e.fields?.[f.id]) { (e.fields ||= {})[f.id] = true; e.updated = Date.now(); } }
@@ -135,6 +197,7 @@ addRoute("groups", "web", board => {
   const candidates = G.knot ? DB.entries.filter(e => e.kind === "faction" && /^(knot|group)\s*#?\s*\d+\b/i.test(e.name.trim())) : [];
   const person = (e, fac, why) => `<span class="gchip" data-char="${e.id}" ${fac ? `data-from="${fac.id}"` : ""} style="--c:${entryColor(e)}" title="${esc(e.summary ? plainLinks(e.summary) : e.name)}">
     <span class="g-grip" aria-hidden="true">⠿</span><a href="#/e/${e.id}" draggable="false">${e.portrait ? assetImg(e.portrait, "g-pic") : `<span class="g-ic">${esc(initials(e.name))}</span>`}${esc(e.name)}</a>
+    ${G.knot ? charMarks(e) : ""}
     ${why?.has("leader") ? `<small class="g-why" title="${G.knot ? "Captain" : "Leader"}">★</small>` : ""}${why && !why.has("member") && !why.has("leader") ? `<small class="g-why" title="Through their Allegiance">⚑</small>` : ""}
     ${fac ? `<button class="mini" data-act="grpLeave" data-char="${e.id}" data-fac="${fac.id}" title="Take ${esc(e.name)} out of ${esc(fac.name)}">✕</button>` : ""}</span>`;
   return [`<div class="page wide groups-page">${webTabs("groups")}
@@ -143,6 +206,7 @@ addRoute("groups", "web", board => {
       ${G.knot ? `<label class="inline">Order <select data-change="knotSort">${Object.entries(KNOT_SORTS).map(([k, l]) => `<option value="${k}" ${k === GRP.sort ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       ${types.length ? `<select data-change="grpType"><option value="">${G.knot ? "Every current status" : "All kinds of group"}</option>${types.map(t => `<option ${t === GRP.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>` : ""}
       ${candidates.length ? `<button class="btn" data-act="knotConvert">Make some factions knots…</button>` : ""}
+      ${G.knot ? `<button class="btn" data-act="specManage" title="The options for the three specialties, and their emojis">⚙ Specialties</button>` : ""}
       <button class="btn accent" data-act="grpNew">+ New ${what}</button></div>
     <p class="muted small">Drag a character onto a ${what} to add them (from one ${what} to another to move them; hold Ctrl or ⌘ to add them to both), or use + Add. ★ ${G.knot ? "captains the knot" : "leads the group; ⚑ is there through their own Allegiance"}.${G.knot ? " Everyone in a knot is a participant in the competition." : ""}</p>
     <div class="groups-board">

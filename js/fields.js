@@ -16,7 +16,7 @@ const FIELD_TYPES = {
    A type ending in "!" is secret. */
 const KIND_TEMPLATES = {
   character: [
-    ["", "Title", "text"], ["", "Pronouns", "text"], ["", "Species", "text"], ["", "Occupation", "text"],
+    ["", "Title", "text"], ["", "Pronouns", "text"], ["", "Gender", "choice", "Male|Female|Other"], ["", "Species", "text"], ["", "Occupation", "text"],
     ["", "Status", "choice", "Alive|Dead|Missing|Unknown|Undead"], ["", "Home", "link"], ["", "Allegiance", "link"], ["", "Birthplace", "link"],
     ["Appearance", "Height", "text"], ["Appearance", "Build", "text"], ["Appearance", "Eyes", "text"], ["Appearance", "Hair", "text"], ["Appearance", "Skin", "text"],
     ["Appearance", "Distinguishing features", "text"], ["Appearance", "Clothing and look", "long"],
@@ -25,6 +25,7 @@ const KIND_TEMPLATES = {
     ["Background", "Upbringing", "long"], ["Background", "Education and training", "text"], ["Background", "Turning points", "long"],
     ["Abilities", "Skills", "list"], ["Abilities", "Talents and magic", "long"], ["Abilities", "Weaknesses", "text"], ["Abilities", "Possessions", "links"],
     ["In the story", "Role", "choice", "Protagonist|Deuteragonist|Antagonist|Love interest|Mentor|Rival|Foil|Ally|Supporting|Minor|Background"], ["In the story", "Participant", "yesno"],
+    ["Competition", "Magical specialty", "choice"], ["Competition", "Martial specialty", "choice"], ["Competition", "Utility specialty", "choice"],
     ["In the story", "Wants", "long"], ["In the story", "Needs", "long"], ["In the story", "Arc", "long"], ["In the story", "Theme", "text"],
     ["Secrets", "Secrets", "long!"], ["Secrets", "What they'd never admit", "long!"],
   ],
@@ -136,7 +137,7 @@ const KIND_TEMPLATES = {
   ],
 };
 const templateFields = id => (KIND_TEMPLATES[id] || []).map(([sec, name, type, opts]) => ({
-  id: uid(), name, sec, type: type.replace("!", ""), ...(opts ? { opts: opts.split("|") } : {}), ...(type.endsWith("!") ? { secret: true } : {}),
+  id: uid(), name, sec, type: type.replace("!", ""), ...(opts ? { opts: opts.split("|") } : type.startsWith("choice") ? { opts: [] } : {}), ...(type.endsWith("!") ? { secret: true } : {}),
 }));
 // Bring a kind up to its template: missing fields are added, nothing is removed
 // or changed, and a field you already have (by name) keeps its values.
@@ -171,7 +172,16 @@ function upgradeKinds(db) {
       if (!kk.fields.some(f => norm(f.name) === "final status")) kk.fields.splice(kk.fields.indexOf(cur) + 1, 0, { id: uid(), name: "Final status", type: "choice", sec: cur.sec || "", opts: [...(cur.opts || [])] });
     }
   }
-  db.fieldsV = 8;
+  // version 9: characters get Gender (beside Pronouns) and three specialties for the competition
+  if (v < 9) {
+    const ck = db.kinds.find(k => k.id === "character");
+    if (ck) {
+      const has = n => ck.fields.some(f => norm(f.name) === n);
+      if (!has("gender") && !has("sex")) { const i = ck.fields.findIndex(f => norm(f.name) === "pronouns"); ck.fields.splice(i >= 0 ? i + 1 : 0, 0, { id: uid(), name: "Gender", type: "choice", sec: i >= 0 ? ck.fields[i].sec || "" : "", opts: ["Male", "Female", "Other"] }); }
+      for (const n of ["Magical specialty", "Martial specialty", "Utility specialty"]) if (!has(norm(n))) ck.fields.push({ id: uid(), name: n, type: "choice", sec: "Competition", opts: [] });
+    }
+  }
+  db.fieldsV = 9;
 }
 
 // sections in the order their first field comes (the unnamed one too)
@@ -196,7 +206,7 @@ function fieldInput(f, v) {
     case "long": return field(label, `<textarea name="${n}" rows="3">${esc(v || "")}</textarea>`, "span2");
     case "list": return field(label, `<textarea name="${n}" rows="3" placeholder="One per line">${esc(v || "")}</textarea>`, "span2");
     case "glossary": return field(label, `<textarea name="${n}" rows="5" placeholder="One per line: word = meaning">${esc(v || "")}</textarea>`, "span2");
-    case "choice": return field(label, `<select name="${n}"><option value="">—</option>${(f.opts || []).map(o => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}${v && !(f.opts || []).includes(v) ? `<option selected>${esc(v)}</option>` : ""}</select>`);
+    case "choice": return field(label, `<select name="${n}"><option value="">—</option>${(f.opts || []).map(o => `<option value="${esc(o)}" ${o === v ? "selected" : ""}>${f.icons?.[o] ? f.icons[o] + " " : ""}${esc(o)}</option>`).join("")}${v && !(f.opts || []).includes(v) ? `<option selected>${esc(v)}</option>` : ""}</select>`);
     case "yesno": return `<label class="check fld"><input type="checkbox" name="${n}" ${v ? "checked" : ""}> ${label}</label>`;
     case "number": return textField(label, n, v ?? "", `type="number" step="any"`);
     default: return textField(label, n, v || "", "data-links");
@@ -218,6 +228,7 @@ function fieldShow(f, v) {
     case "link": { const e = byId(DB.entries, Array.isArray(v) ? v[0] : v); return e ? chip("e", e) : "—"; }
     case "links": return `<div class="chips">${(Array.isArray(v) ? v : [v]).map(id => chip("e", byId(DB.entries, id))).join("")}</div>`;
     case "date": return esc(fmtDate(v));
+    case "choice": return (f.icons?.[v] ? f.icons[v] + " " : "") + esc(v);
     case "yesno": return v ? "Yes" : "No";
     case "long": return `<div class="prose">${md(v)}</div>`;
     case "glossary": {

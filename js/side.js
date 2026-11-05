@@ -9,6 +9,7 @@
    in the main view instead. While you're working in the panel, a change
    made there redraws the panel and leaves a scene you're writing alone. */
 
+let IN_SIDE = false; // drawing a page in the panel (it has its own ‹)
 const SIDE = { open: false, hash: "", back: [], owner: false };
 try { Object.assign(SIDE, JSON.parse(localStorage.getItem("moth_side") || "{}"), { back: [], owner: false }); } catch {}
 const keepSide = () => { try { localStorage.setItem("moth_side", JSON.stringify({ open: SIDE.open, hash: SIDE.hash })); } catch {} };
@@ -21,7 +22,7 @@ function sideView(hash) {
   return r && !["sc", "draw", "settings"].includes(r.prefix) ? { r, args: parts.slice(1) } : null;
 }
 function sideHome() {
-  const sc = CUR.prefix === "sc" && sceneCtx(CUR.args[0]);
+  const sc = CUR.prefix === "sc" ? sceneCtx(CUR.args[0]) : null;
   const links = [
     sc && [`#/plan/${sc.book.id}`, "📖 This book's plan"],
     sc?.sc.pov && [`#/e/${sc.sc.pov}`, "👤 " + (byId(DB.entries, sc.sc.pov)?.name || "POV")],
@@ -43,8 +44,9 @@ function renderSide() {
   let html, after;
   if (!v) html = sideHome();
   else {
-    try { const out = v.r.view(...v.args); [html, after] = Array.isArray(out) ? out : [out]; }
+    try { IN_SIDE = true; const out = v.r.view(...v.args); [html, after] = Array.isArray(out) ? out : [out]; }
     catch (e) { console.error(e); html = `<div class="page"><p class="empty">Something went wrong showing this: ${esc(e.message)}</p></div>`; }
+    finally { IN_SIDE = false; }
   }
   const y = $(".side-body", box)?.scrollTop || 0, same = box.dataset.hash === SIDE.hash;
   box.innerHTML = `<div class="side-bar">

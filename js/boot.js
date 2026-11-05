@@ -11,7 +11,15 @@
     SYNC.applying = true; save(); SYNC.applying = false;
     setTimeout(() => toast(`Welcome to Moth. This is a sample world to explore; start your own from <a href="#/settings">Settings</a>.`, { html: true, ms: 9000 }), 400);
   }
-  window.addEventListener("hashchange", () => { acClose(); route(); $("#main").scrollTop = 0; });
+  // going back returns to where you were on that page; anywhere new starts at the top
+  window.addEventListener("hashchange", e => {
+    acClose();
+    const main = $("#main"), from = "#" + (e.oldURL.split("#")[1] || "");
+    NAV.scroll[from] = main.scrollTop;
+    const back = NAV.backing; NAV.backing = false;
+    route();
+    main.scrollTop = back ? NAV.scroll[location.hash] || 0 : 0;
+  });
   route();
   setSync(syncOn() ? (ls.get("dirty") ? "pending" : "ok") : "off");
   if (syncOn()) pull({ quiet: true });

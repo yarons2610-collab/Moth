@@ -205,17 +205,21 @@ const EMOJI = {
   Symbols: "⚑ flag|🚩 banner|🏳️ white flag|🏴 black flag|⚜️ fleur-de-lis heraldry|🔰 emblem|📍 pin place|❖ diamond|◆ shape|★ star shape|☘️ clover luck|♠️ spade|♥️ heart|♦️ diamond suit|♣️ club|⚕️ medicine|☢️ hazard|⚠️ warning danger|❓ unknown mystery|❗ important|💡 idea|💬 speech|🗒️ note|📅 calendar date|🧩 puzzle|🎯 goal target|🔑 secret answer|🧬 bloodline|🩸 blood|🫀 heart",
 };
 const emojiList = () => Object.entries(EMOJI).map(([g, s]) => [g, s.split("|").map(x => { const i = x.indexOf(" "); return [x.slice(0, i), x.slice(i + 1)]; })]);
-function emojiPicker(current) {
-  return `<div class="icon-pick">
-    <button type="button" class="icon-current" data-act="iconPickToggle" title="Pick an icon">${esc(current)}</button>
-    <input name="icon" value="${esc(current)}" class="icon-input" maxlength="16" title="Or type or paste any emoji" data-input="iconTyped">
-    <div class="emoji-pick" hidden>
-      <input type="search" class="emoji-search" placeholder="Search: dragon, temple, skull…" data-input="emojiSearch">
+const emojiPickInner = () => `<input type="search" class="emoji-search" placeholder="Search: dragon, temple, skull…" data-input="emojiSearch">
       <div class="emoji-groups">${emojiList().map(([g, list]) => `<div class="emoji-group"><h5>${g}</h5><div class="emoji-grid">${list.map(([e, words]) =>
-        `<button type="button" class="emoji" data-act="emojiPick" data-e="${e}" data-words="${esc(words)}" title="${esc(words)}">${e}</button>`).join("")}</div></div>`).join("")}</div>
-    </div></div>`;
+        `<button type="button" class="emoji" data-act="emojiPick" data-e="${e}" data-words="${esc(words)}" title="${esc(words)}">${e}</button>`).join("")}</div></div>`).join("")}</div>`;
+// lazy: the grid is only built when it's opened (some windows have many pickers)
+function emojiPicker(current, { name = "icon", lazy = false, blank = "◆" } = {}) {
+  return `<div class="icon-pick">
+    <button type="button" class="icon-current" data-act="iconPickToggle" title="Pick an emoji">${esc(current || blank)}</button>
+    <input ${name ? `name="${name}"` : ""} value="${esc(current)}" class="icon-input" maxlength="16" title="Or type or paste any emoji" data-input="iconTyped">
+    <div class="emoji-pick" hidden>${lazy ? "" : emojiPickInner()}</div></div>`;
 }
-ACT.iconPickToggle = el => { const p = el.parentElement.querySelector(".emoji-pick"); p.hidden = !p.hidden; if (!p.hidden) p.querySelector(".emoji-search").focus(); };
+ACT.iconPickToggle = el => {
+  const p = el.parentElement.querySelector(".emoji-pick");
+  if (!p.children.length) p.innerHTML = emojiPickInner();
+  p.hidden = !p.hidden; if (!p.hidden) p.querySelector(".emoji-search").focus();
+};
 ACT.emojiPick = el => {
   const box = el.closest(".icon-pick");
   $(".icon-input", box).value = el.dataset.e;
@@ -352,6 +356,8 @@ ACT.editKind = el => {
           if (!name) return null;
           const sec = $(".kf-sec-name", r.closest(".kf-card")).value.trim();
           const f = { id: r.dataset.id || byName.get(norm(name)) || uid(), name, type, sec };
+          const was = before.find(x => x.id === f.id);
+          if (was?.icons && type === "choice") f.icons = was.icons;
           if (type === "choice") f.opts = splitList($(".kf-opts", r).value);
           if ($(".kf-secret input", r).checked) f.secret = true;
           return f;
