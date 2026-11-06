@@ -152,6 +152,51 @@ ACT.specManage = () => {
 };
 ACT.specAdd = el => { const w = el.closest(".modal-wrap"), list = $(".spec-list", el.closest(".spec-col")); list.insertAdjacentHTML("beforeend", w._row()); $$(".spec-name", list).pop().focus(); };
 ACT.specDel = el => el.closest(".spec-row").remove();
+/* the ▾ beside a name: set gender and the three specialties right there.
+   Each tap saves at once and updates the marks beside the name. */
+const genderField = () => byId(DB.kinds, "character")?.fields.find(x => ["gender", "sex"].includes(norm(x.name)));
+function quickPanel(e) {
+  const gf = genderField(), gv = gf && e.fields?.[gf.id];
+  const gopts = gf?.type === "choice" && gf.opts?.length ? gf.opts : ["Male", "Female", "Other"];
+  const sym = o => /^m(ale)?$/i.test(o) ? "♂ " : /^f(emale)?$/i.test(o) ? "♀ " : "";
+  return `<div class="qp-h"><b>${esc(e.name)}</b><button class="mini" data-act="quickClose" aria-label="Close">×</button></div>
+    ${gf ? `<div class="qp-row"><span>Gender</span><div class="qp-opts">${gopts.map(o => `<button class="qp-opt ${o === gv ? "on" : ""} ${/^m/i.test(o) ? "m" : /^f/i.test(o) ? "f" : ""}" data-act="quickSet" data-f="${gf.id}" data-v="${esc(o)}">${sym(o)}${esc(o)}</button>`).join("")}</div></div>` : ""}
+    ${SPECS.map(([k, label]) => {
+      const f = specField(k), v = f && e.fields?.[f.id];
+      if (!f) return "";
+      return `<div class="qp-row"><span>${label}</span><div class="qp-opts">${(f.opts || []).map(o => `<button class="qp-opt ${o === v ? "on" : ""}" data-act="quickSet" data-f="${f.id}" data-v="${esc(o)}" title="${esc(o)}">${f.icons?.[o] ? `<span class="qp-ic">${f.icons[o]}</span>` : ""}${esc(o)}</button>`).join("") || `<small class="muted">No options yet: <a data-act="specManage">⚙ Specialties</a></small>`}</div></div>`;
+    }).join("")}
+    <a class="qp-link" href="#/e/${e.id}">Open ${esc(e.name)}'s page →</a>`;
+}
+ACT.quickChar = el => {
+  const e = byId(DB.entries, el.dataset.char);
+  if (!e) return;
+  ACT.quickClose();
+  const pop = document.createElement("div");
+  pop.className = "quick-pop";
+  pop.dataset.char = e.id;
+  pop.innerHTML = quickPanel(e);
+  document.body.append(pop);
+  // beside the ▾, kept on screen
+  const r = el.getBoundingClientRect(), w = Math.min(340, innerWidth - 16);
+  pop.style.width = w + "px";
+  pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
+  const h = pop.offsetHeight;
+  pop.style.top = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+};
+ACT.quickSet = el => {
+  const pop = el.closest(".quick-pop"), e = byId(DB.entries, pop.dataset.char), f = el.dataset.f, v = el.dataset.v;
+  e.fields ||= {};
+  if (e.fields[f] === v) delete e.fields[f]; else e.fields[f] = v; // tap again to clear
+  e.updated = Date.now();
+  save({ quiet: true });
+  pop.innerHTML = quickPanel(e);
+  for (const m of $$(`.gchip[data-char="${e.id}"] .g-marks`)) m.innerHTML = charMarks(e);
+};
+ACT.quickClose = () => { for (const p of $$(".quick-pop")) p.remove(); };
+document.addEventListener("pointerdown", e => { if ($(".quick-pop") && !e.target.closest(".quick-pop, [data-act=quickChar]")) ACT.quickClose(); }, true);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $(".quick-pop")) ACT.quickClose(); });
+on("route", () => ACT.quickClose());
 const participantField = () => byId(DB.kinds, "character")?.fields.find(f => norm(f.name) === "participant");
 const isParticipant = e => { const f = participantField(); return !!(f && e.fields?.[f.id]); };
 function markParticipant(e) { const f = participantField(); if (f && e && e.kind === "character" && !e.fields?.[f.id]) { (e.fields ||= {})[f.id] = true; e.updated = Date.now(); } }
@@ -197,7 +242,7 @@ addRoute("groups", "web", board => {
   const candidates = G.knot ? DB.entries.filter(e => e.kind === "faction" && /^(knot|group)\s*#?\s*\d+\b/i.test(e.name.trim())) : [];
   const person = (e, fac, why) => `<span class="gchip" data-char="${e.id}" ${fac ? `data-from="${fac.id}"` : ""} style="--c:${entryColor(e)}" title="${esc(e.summary ? plainLinks(e.summary) : e.name)}">
     <span class="g-grip" aria-hidden="true">⠿</span><a href="#/e/${e.id}" draggable="false">${e.portrait ? assetImg(e.portrait, "g-pic") : `<span class="g-ic">${esc(initials(e.name))}</span>`}${esc(e.name)}</a>
-    ${G.knot ? charMarks(e) : ""}
+    ${G.knot ? `<span class="g-marks">${charMarks(e)}</span><button class="mini g-more" data-act="quickChar" data-char="${e.id}" title="Gender and specialties" aria-label="Gender and specialties of ${esc(e.name)}">▾</button>` : ""}
     ${why?.has("leader") ? `<small class="g-why" title="${G.knot ? "Captain" : "Leader"}">★</small>` : ""}${why && !why.has("member") && !why.has("leader") ? `<small class="g-why" title="Through their Allegiance">⚑</small>` : ""}
     ${fac ? `<button class="mini" data-act="grpLeave" data-char="${e.id}" data-fac="${fac.id}" title="Take ${esc(e.name)} out of ${esc(fac.name)}">✕</button>` : ""}</span>`;
   return [`<div class="page wide groups-page">${webTabs("groups")}

@@ -943,3 +943,21 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .spec-row .icon-input { display: none; }
 .spec-row .spec-name { flex: 1; min-width: 0; }
 .spec-row .emoji-pick { position: absolute; z-index: 20; top: 40px; left: 0; width: min(340px, 80vw); max-height: 300px; overflow: auto; background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; padding: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+
+/* the quick panel beside a name on the knots board */
+.g-marks { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.g-more { font-size: 11px; padding: 2px 5px; }
+.quick-pop { position: fixed; z-index: 60; background: var(--panel2); border: 1px solid var(--line2); border-radius: 12px; padding: 10px 12px; box-shadow: 0 14px 40px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 8px; max-height: calc(100dvh - 16px); overflow: auto; }
+.qp-h { display: flex; align-items: center; justify-content: space-between; }
+.qp-row { display: flex; flex-direction: column; gap: 4px; }
+.qp-row > span { color: var(--ink-faint); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
+.qp-opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.qp-opt { border: 1px solid var(--line2); background: var(--bg2); color: var(--ink-dim); border-radius: 99px; padding: 3px 10px; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+.qp-opt:hover { color: var(--ink); }
+.qp-opt.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--bg2)); color: var(--ink); }
+.qp-opt.m.on { border-color: #5aa9f0; background: color-mix(in srgb, #5aa9f0 22%, var(--bg2)); }
+.qp-opt.f.on { border-color: #f07ab8; background: color-mix(in srgb, #f07ab8 22%, var(--bg2)); }
+.qp-ic { font-size: 15px; }
+.qp-link { font-size: 12.5px; color: var(--ink-dim); }
+.gchip .g-more { opacity: .9; border: 1px solid var(--line2); border-radius: 6px; color: var(--ink-dim); }
+.gchip .g-more:hover { color: var(--ink); border-color: var(--accent); }
