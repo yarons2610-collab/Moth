@@ -250,15 +250,24 @@ function knotSorter(G, numOf) {
   switch (GRP.sort) {
     case "numdown": return (a, b) => -byNum(a, b);
     case "name": return (a, b) => a.name.localeCompare(b.name);
-    // in the order the status choices are listed (change it in the Knot kind), then by number
+    // the first row (Competing / Underground / Winner) by number; then the rest,
+    // by status in the order the choices are listed in the Knot kind, then by number
     case "status": case "middle": case "final": {
-      const f = GRP.sort === "final" ? G.final : GRP.sort === "middle" ? G.middle : st;
+      const t = knotTier(G), f = t.f;
       const rank = e => { const v = val(e, f); const i = (f?.opts || []).indexOf(v); return v ? (i < 0 ? 900 : i) : 999; };
-      return (a, b) => rank(a) - rank(b) || byNum(a, b);
+      return (a, b) => t.top(b) - t.top(a) || (t.top(a) ? 0 : rank(a) - rank(b)) || byNum(a, b);
     }
     case "score": { const sc = e => { const n = parseFloat(val(e, sf)); return isNaN(n) ? -Infinity : n; }; return (a, b) => sc(b) - sc(a) || byNum(a, b); }
     default: return byNum;
   }
+}
+// ordering by a status splits the knots in two rows: those with the status that
+// matters (still competing, underground, the winners) and everyone else
+const KNOT_TIERS = { status: ["type", "competing", "Competing", "Not competing"], middle: ["middle", "underground", "Underground", "Not underground"], final: ["final", "winner", "Winners", "Not winners"] };
+function knotTier(G) {
+  const [key, want, label, rest] = KNOT_TIERS[GRP.sort] || [];
+  const f = key && G[key];
+  return { f, label, rest, on: !!f, top: e => f && norm(String(e.fields?.[f.id] ?? "")) === want ? 1 : 0 };
 }
 ACT.knotSort = el => { GRP.sort = el.value; try { localStorage.setItem("moth_knot_sort", GRP.sort); } catch {} rerender(); };
 
@@ -303,9 +312,14 @@ addRoute("groups", "web", board => {
         ${G.knot ? `<p class="muted small">Only participants are listed${others ? `; ${plural(others, "other character")} aren't (+ Add on a knot lists everyone, or tick Participant on a character's page)` : ""}.</p>` : ""}
         <button class="btn small ghost" data-act="grpNewChar" data-fac="">+ New ${G.knot ? "participant" : "character"}</button>
       </section>
-      ${facs.map(f => {
+      ${facs.map((f, i) => {
+        const tier = G.knot ? knotTier(G) : null;
+        const brk = tier?.on && i > 0 && tier.top(facs[i - 1]) && !tier.top(f)
+          ? `<div class="gbreak"><span>${esc(tier.rest)}</span><small>${facs.length - i}</small></div>` : "";
+        const head = tier?.on && i === 0 && tier.top(f) && facs.some(x => !tier.top(x))
+          ? `<div class="gbreak first"><span>${esc(tier.label)}</span><small>${facs.filter(x => tier.top(x)).length}</small></div>` : "";
         const ms = groupMembers(f, G).filter(m => match(m.e) || !q);
-        return `<section class="gcol" data-fac="${f.id}" style="--c:${entryColor(f)}">
+        return `${head}${brk}<section class="gcol" data-fac="${f.id}" style="--c:${entryColor(f)}">
           <div class="gcol-h"><a href="#/e/${f.id}">${f.portrait ? assetImg(f.portrait, "g-pic") : `<span>${kindOf(f).icon}</span>`} <b>${esc(f.name)}</b></a><small>${ms.length}</small>
             ${G.knot ? `<button class="mini g-more" data-act="quickKnot" data-knot="${f.id}" title="Statuses and score" aria-label="Statuses and score of ${esc(f.name)}">▾</button>` : ""}</div>
           ${G.knot ? `<div class="gcol-meta">${knotPills(f, G)}</div>` : ""}

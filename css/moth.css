@@ -974,3 +974,7 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .ver-scenes summary { cursor: pointer; }
 .ver-article { max-height: 50vh; overflow: auto; }
 .ver-name .now-badge { align-self: flex-start; margin: 2px 0; }
+/* ordering knots by a status: the rest start a new row */
+.gbreak { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--ink-faint); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-top: 10px; }
+.gbreak.first { margin-top: 0; }
+.gbreak::after { content: ""; flex: 1; border-top: 1px solid var(--line2); }

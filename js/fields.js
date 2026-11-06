@@ -123,7 +123,7 @@ const KIND_TEMPLATES = {
     ["Secrets", "What really happened", "long!"],
   ],
   knot: [
-    ["", "Number", "number"], ["", "Current status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Middle status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Final status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Score", "number"],
+    ["", "Number", "number"], ["", "Current status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Middle status", "choice", "Underground|Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Final status", "choice", "Competing|Winner|Eliminated|Disqualified|Disbanded"], ["", "Score", "number"],
     ["", "Captain", "link"], ["", "Members", "links"],
     ["The competition", "Progress", "long"], ["The competition", "Rivals", "links"], ["The competition", "Strengths", "long"], ["The competition", "Weaknesses", "long"],
     ["Secrets", "Secrets", "long!"],
@@ -190,7 +190,12 @@ function upgradeKinds(db) {
       kk.fields.splice(at, 0, { id: uid(), name: "Middle status", type: "choice", sec: like.sec || "", opts: [...(like.opts || [])] });
     }
   }
-  db.fieldsV = 10;
+  // version 11: "Underground" is a middle status, listed first
+  if (v < 11) {
+    const mid = db.kinds.find(k => k.id === "knot")?.fields.find(f => norm(f.name) === "middle status");
+    if (mid?.type === "choice" && !(mid.opts || []).some(o => norm(o) === "underground")) mid.opts = ["Underground", ...(mid.opts || [])];
+  }
+  db.fieldsV = 11;
 }
 
 // sections in the order their first field comes (the unnamed one too)
