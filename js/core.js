@@ -30,7 +30,7 @@ const emit = (name, ...args) => (HOOKS[name] || []).forEach(fn => fn(...args));
 /* ── data ── */
 const DB_KEY = "moth_db";
 // shown in Settings, so you can tell which version a device is running
-const APP_VERSION = "2026-11-08";
+const APP_VERSION = "2026-11-08c";
 const DB_ARRAYS = ["kinds", "entries", "events", "books", "notes", "maps", "sessions", "quests", "encounters", "tables", "handouts", "stamps", "threads", "themes", "setups", "families"];
 let DB;
 
@@ -61,7 +61,7 @@ function normalizeDB(d) {
   d.world = Object.assign({ name: "Untitled world", eras: [{ id: uid(), name: "First Age", abbr: "FA", start: 1 }], months: [], now: { y: 1 } }, d.world || {});
   if (!d.world.eras.length) d.world.eras = [{ id: uid(), name: "Age", abbr: "", start: 1 }];
   for (const k of DB_ARRAYS) if (!Array.isArray(d[k])) d[k] = [];
-  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 9; }
+  if (!d.kinds.length) { d.kinds = defaultKinds(); d.fieldsV = 10; }
   upgradeKinds(d);
   if (typeof syncEvents === "function") syncEvents(d);
   if (typeof ensureParticipants === "function") ensureParticipants(d);

@@ -17,7 +17,7 @@
 const GRP = { q: "", type: "", board: "faction", sort: "num" };
 try { GRP.sort = localStorage.getItem("moth_knot_sort") || "num"; } catch {}
 // how the knots board can be ordered
-const KNOT_SORTS = { num: "Number, ascending", numdown: "Number, descending", status: "Current status", final: "Final status", score: "Score, highest first", name: "Name, A to Z" };
+const KNOT_SORTS = { num: "Number, ascending", numdown: "Number, descending", status: "Current status", middle: "Middle status", final: "Final status", score: "Score, highest first", name: "Name, A to Z" };
 const fieldNamed = (k, names, types) => k?.fields.find(f => names.includes(norm(f.name)) && (!types || types.includes(f.type)));
 function groupFields(kindId = GRP.board) {
   const fk = byId(DB.kinds, kindId), ck = byId(DB.kinds, "character"), knot = kindId === "knot";
@@ -27,6 +27,7 @@ function groupFields(kindId = GRP.board) {
     lead: fieldNamed(fk, ["captain", "leader", "leaders"], ["link", "links"]),
     alleg: knot ? null : fieldNamed(ck, ["allegiance", "allegiances", "faction", "factions"], ["link", "links"]),
     type: fieldNamed(fk, knot ? ["current status", "status"] : ["type"], ["choice", "text"]),
+    middle: knot ? fieldNamed(fk, ["middle status"], ["choice", "text"]) : null,
     final: knot ? fieldNamed(fk, ["final status"], ["choice", "text"]) : null,
     num: knot ? fieldNamed(fk, ["number"], ["number", "text"]) : null,
   };
@@ -190,11 +191,52 @@ ACT.quickSet = el => {
   if (e.fields[f] === v) delete e.fields[f]; else e.fields[f] = v; // tap again to clear
   e.updated = Date.now();
   save({ quiet: true });
+  if (pop.dataset.knot) { pop.innerHTML = knotPanel(e); const meta = $(`.gcol[data-fac="${e.id}"] .gcol-meta`); if (meta) meta.innerHTML = knotPills(e); return; }
   pop.innerHTML = quickPanel(e);
   for (const m of $$(`.gchip[data-char="${e.id}"] .g-marks`)) m.innerHTML = charMarks(e);
 };
+// a knot's statuses and score, as pills on its card
+function knotPills(f, G = groupFields("knot")) {
+  const sf = fieldNamed(G.fk, ["score"]), val = x => x && f.fields?.[x.id];
+  const cur = val(G.type), mid = val(G.middle), fin = val(G.final), sc = val(sf);
+  return [cur && `<span class="pill" title="Current status">${esc(cur)}</span>`, mid && `<span class="pill" title="Middle status">Middle: ${esc(mid)}</span>`,
+    fin && `<span class="pill final" title="Final status">Final: ${esc(fin)}</span>`, sc != null && sc !== "" && `<span class="pill">Score ${esc(sc)}</span>`].filter(Boolean).join("");
+}
+// the ▾ on a knot's card: its three statuses and its score, right there
+function knotPanel(k) {
+  const G = groupFields("knot"), sf = fieldNamed(G.fk, ["score"]);
+  const row = (f, label) => f ? `<div class="qp-row"><span>${label}</span><div class="qp-opts">${(f.opts || []).map(o => `<button class="qp-opt ${o === k.fields?.[f.id] ? "on" : ""}" data-act="quickSet" data-f="${f.id}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div></div>` : "";
+  return `<div class="qp-h"><b>${esc(k.name)}</b><button class="mini" data-act="quickClose" aria-label="Close">×</button></div>
+    ${row(G.type, "Current status")}${row(G.middle, "Middle status")}${row(G.final, "Final status")}
+    ${sf ? `<div class="qp-row"><span>Score</span><input type="number" step="any" class="qp-score" value="${esc(k.fields?.[sf.id] ?? "")}" data-input="quickScore" data-f="${sf.id}" placeholder="—"></div>` : ""}
+    <a class="qp-link" href="#/e/${k.id}">Open ${esc(k.name)}'s page →</a>`;
+}
+ACT.quickKnot = el => {
+  const k = byId(DB.entries, el.dataset.knot);
+  if (!k) return;
+  ACT.quickClose();
+  const pop = document.createElement("div");
+  pop.className = "quick-pop";
+  pop.dataset.char = k.id;
+  pop.dataset.knot = "1";
+  pop.innerHTML = knotPanel(k);
+  document.body.append(pop);
+  const r = el.getBoundingClientRect(), w = Math.min(360, innerWidth - 16);
+  pop.style.width = w + "px";
+  pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
+  const h = pop.offsetHeight;
+  pop.style.top = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+};
+ACT.quickScore = el => {
+  const pop = el.closest(".quick-pop"), k = byId(DB.entries, pop.dataset.char), v = el.value.trim();
+  k.fields ||= {};
+  if (v === "") delete k.fields[el.dataset.f]; else k.fields[el.dataset.f] = isNaN(+v) ? v : +v;
+  k.updated = Date.now();
+  save({ quiet: true });
+  const meta = $(`.gcol[data-fac="${k.id}"] .gcol-meta`); if (meta) meta.innerHTML = knotPills(k);
+};
 ACT.quickClose = () => { for (const p of $$(".quick-pop")) p.remove(); };
-document.addEventListener("pointerdown", e => { if ($(".quick-pop") && !e.target.closest(".quick-pop, [data-act=quickChar]")) ACT.quickClose(); }, true);
+document.addEventListener("pointerdown", e => { if ($(".quick-pop") && !e.target.closest(".quick-pop, [data-act=quickChar], [data-act=quickKnot]")) ACT.quickClose(); }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $(".quick-pop")) ACT.quickClose(); });
 on("route", () => ACT.quickClose());
 const participantField = () => byId(DB.kinds, "character")?.fields.find(f => norm(f.name) === "participant");
@@ -209,8 +251,8 @@ function knotSorter(G, numOf) {
     case "numdown": return (a, b) => -byNum(a, b);
     case "name": return (a, b) => a.name.localeCompare(b.name);
     // in the order the status choices are listed (change it in the Knot kind), then by number
-    case "status": case "final": {
-      const f = GRP.sort === "final" ? G.final : st;
+    case "status": case "middle": case "final": {
+      const f = GRP.sort === "final" ? G.final : GRP.sort === "middle" ? G.middle : st;
       const rank = e => { const v = val(e, f); const i = (f?.opts || []).indexOf(v); return v ? (i < 0 ? 900 : i) : 999; };
       return (a, b) => rank(a) - rank(b) || byNum(a, b);
     }
@@ -264,12 +306,9 @@ addRoute("groups", "web", board => {
       ${facs.map(f => {
         const ms = groupMembers(f, G).filter(m => match(m.e) || !q);
         return `<section class="gcol" data-fac="${f.id}" style="--c:${entryColor(f)}">
-          <div class="gcol-h"><a href="#/e/${f.id}">${f.portrait ? assetImg(f.portrait, "g-pic") : `<span>${kindOf(f).icon}</span>`} <b>${esc(f.name)}</b></a><small>${ms.length}</small></div>
-          ${G.knot ? (() => {
-            const sf = fieldNamed(G.fk, ["score"]), cur = G.type && f.fields?.[G.type.id], fin = G.final && f.fields?.[G.final.id], sc = sf && f.fields?.[sf.id];
-            const pills = [cur && `<span class="pill" title="Current status">${esc(cur)}</span>`, fin && `<span class="pill final" title="Final status">Final: ${esc(fin)}</span>`, sc != null && sc !== "" && `<span class="pill">Score ${esc(sc)}</span>`].filter(Boolean);
-            return pills.length ? `<div class="gcol-meta">${pills.join("")}</div>` : "";
-          })() : ""}
+          <div class="gcol-h"><a href="#/e/${f.id}">${f.portrait ? assetImg(f.portrait, "g-pic") : `<span>${kindOf(f).icon}</span>`} <b>${esc(f.name)}</b></a><small>${ms.length}</small>
+            ${G.knot ? `<button class="mini g-more" data-act="quickKnot" data-knot="${f.id}" title="Statuses and score" aria-label="Statuses and score of ${esc(f.name)}">▾</button>` : ""}</div>
+          ${G.knot ? `<div class="gcol-meta">${knotPills(f, G)}</div>` : ""}
           ${f.summary ? `<p class="gcol-sum">${esc(plainLinks(f.summary))}</p>` : ""}
           <div class="gcol-list">${ms.map(m => person(m.e, f, m.why)).join("") || `<p class="muted small">No members yet.</p>`}</div>
           <div class="gcol-f"><button class="btn small" data-act="grpPick" data-fac="${f.id}">+ Add</button><button class="btn small ghost" data-act="grpNewChar" data-fac="${f.id}">+ New ${G.knot ? "participant" : "character"}</button></div>
