@@ -964,3 +964,13 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .gcol-h .g-more { margin-left: 4px; }
 .gcol-meta:empty { display: none; }
 .qp-score { width: 120px; padding: 4px 8px; }
+
+/* versions of scenes and chapters */
+.btn.has-ver { border-color: var(--accent2, var(--accent)); }
+.btn.has-ver small { color: var(--ink-faint); }
+.ver-dot { font-size: 11.5px; color: var(--accent2, var(--accent)); border: 1px solid var(--line2); border-radius: 99px; padding: 0 7px; }
+.ver-table tr.same td { opacity: .6; }
+.ver-scenes { padding-left: 18px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.ver-scenes summary { cursor: pointer; }
+.ver-article { max-height: 50vh; overflow: auto; }
+.ver-name .now-badge { align-self: flex-start; margin: 2px 0; }

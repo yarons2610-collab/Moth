@@ -100,12 +100,13 @@ addRoute("book", "story", id => {
     ${chs.map((ch, ci) => `<section class="chapter" data-ci="${ci}">
       <div class="chapter-h"><button type="button" class="drag-h" data-drag="ch" aria-label="Drag to move this chapter" title="Drag to move">⠿</button><h3>${ci + 1}. ${esc(ch.title)}</h3>
         <span class="row-tools"><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveCh" data-b="${b.id}" data-i="${ci}" data-d="1" title="Move down">↓</button>
+        ${svBadge("ch", ch)}<button class="mini" data-act="svOpen" data-t="ch" data-id="${ch.id}" title="Versions of this chapter">⎇</button>
         <button class="mini" data-act="renameCh" data-b="${b.id}" data-i="${ci}" title="Edit the title and plan">✎</button><button class="mini" data-act="deleteCh" data-b="${b.id}" data-i="${ci}" title="Delete">🗑</button></span></div>
       ${ch.summary?.trim() ? `<details class="ch-sum" data-ch="${ch.id}" ${FOLD.book.has(ch.id) ? "" : "open"}><summary>Plan</summary><div class="prose">${md(ch.summary)}</div></details>` : ""}
       <ol class="scenes">${(ch.scenes || []).map((sc, si) => {
         const pov = byId(DB.entries, sc.pov), set = byId(DB.entries, sc.setting), st = STATUSES[sc.status || "idea"];
         return `<li data-sid="${sc.id}"><button type="button" class="drag-h" data-drag="sc" aria-label="Drag to move this scene" title="Drag to move">⠿</button><a class="scene-row" href="#/sc/${sc.id}"><span class="status" style="--c:${st[1]}">${st[0]}</span>
-          <b>${esc(sc.title)}</b><small>${[pov && "POV " + pov.name, set && set.name, sc.date && fmtDate(sc.date), countWords(sc.body) + " words"].filter(Boolean).map(esc).join(" · ")}</small></a>
+          <b>${esc(sc.title)}</b>${(sc.versions || []).length ? `<span class="ver-dot" title="${esc(svLive(sc))}, and ${plural(sc.versions.length, "other version")}">⎇ ${sc.versions.length + 1}</span>` : ""}<small>${[pov && "POV " + pov.name, set && set.name, sc.date && fmtDate(sc.date), countWords(sc.body) + " words"].filter(Boolean).map(esc).join(" · ")}</small></a>
           <span class="row-tools"><button class="mini" data-act="moveSc" data-id="${sc.id}" data-d="-1" title="Move up">↑</button><button class="mini" data-act="moveSc" data-id="${sc.id}" data-d="1" title="Move down">↓</button>
             ${chs.length > 1 ? `<select class="sc-move" data-change="scMoveTo" data-id="${sc.id}" title="Move to another chapter" aria-label="Move to another chapter"><option value="">Move to…</option>${chOpts()}</select>` : ""}</span></li>`;
       }).join("")}</ol>
@@ -216,6 +217,7 @@ addRoute("sc", "story", id => {
       <label>Setting <select data-change="sceneMeta" data-k="setting" data-id="${sc.id}">${entryOptions(sc.setting, { kind: "place" })}</select></label>
       <label>When <input data-change="sceneDate" data-id="${sc.id}" value="${esc(fmtDate(sc.date))}" placeholder="in-world date" size="12"></label>
       <label>Target <input type="number" data-change="sceneMeta" data-k="target" data-id="${sc.id}" value="${sc.target || ""}" placeholder="words" style="width:6em"></label>
+      ${svButton("sc", sc)}
       <button class="btn small" data-act="toggleRead">${STORY.read ? "✎ Write" : "📖 Read"}</button>
       <button class="btn small ghost" data-act="deleteScene" data-id="${sc.id}" title="Delete scene">🗑</button>
     </div>
