@@ -129,7 +129,7 @@ function bookBlocks(b, { summaries = false } = {}) {
   const out = [P("Title", b.title || "Untitled")];
   if (b.summary) out.push(P("Subtitle", mdRuns(b.summary)));
   (b.chapters || []).forEach((ch, ci) => {
-    out.push(PAGE, P("Heading1", `${ci + 1}. ${ch.title || "Chapter " + (ci + 1)}`));
+    out.push(PAGE, P("Heading1", chHeading(b, ch)));
     if (summaries && ch.summary?.trim()) out.push(...mdBlocks(ch.summary, 2).map(x => x.s ? x : { ...x, s: "Meta" }));
     (ch.scenes || []).forEach((sc, si) => {
       if (si) out.push(P("Break", "⁂"));

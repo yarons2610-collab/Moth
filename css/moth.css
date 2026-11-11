@@ -830,7 +830,7 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .dragging .drag-h { cursor: grabbing; }
 .scenes li.dragging .scene-row, .chapter.dragging { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: 10px; }
 .scenes li.dragging { opacity: .85; }
-.book-page.dragging-ch .scenes, .book-page.dragging-ch .chapter > .btn { display: none; }
+.book-page.dragging-ch .scenes, .book-page.dragging-ch .chapter > .btn, .book-page.dragging-ch .ch-sum { display: none; }
 .book-page.dragging-ch .chapter { padding: 4px 0; }
 .scenes { min-height: 12px; }
 .sc-move { width: auto; max-width: 140px; padding: 3px 6px; font-size: 12px; color: var(--ink-dim); }
