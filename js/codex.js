@@ -453,6 +453,22 @@ ACT.setPortrait = async el => {
   if (img) { e.portrait = img.id; commit(); }
 };
 
+document.addEventListener("paste", async ev => {
+  if (CUR.prefix !== "e" || MODALS.length || isTyping(document.activeElement)) return;
+  const e = byId(DB.entries, CUR.args[0]), got = clipImage(ev.clipboardData);
+  if (!e || !got?.blob) return;
+  ev.preventDefault();
+  const url = URL.createObjectURL(got.blob);
+  let yes = false;
+  await new Promise(res => modal({ title: `Use this as ${e.name}'s picture?`,
+    body: `<img class="portrait-big" src="${url}" alt="">${e.portrait ? `<p class="muted small">It replaces the picture there now.</p>` : ""}`,
+    buttons: [{ label: "Cancel" }, { label: e.portrait ? "Replace the picture" : "Use it", cls: "accent", act: () => { yes = true; } }], onClose: res }));
+  URL.revokeObjectURL(url);
+  if (!yes) return;
+  try { const { data } = await readImage(got.blob, 640); const id = await assetPut(data); withUndo(`New picture for ${e.name}`, () => { e.portrait = id; }); }
+  catch (er) { toast(er.message); }
+});
+
 /* links to things that don't exist yet can create them */
 ACT.newFromLink = el => {
   const name = el.dataset.name;

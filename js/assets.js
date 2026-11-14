@@ -71,6 +71,7 @@ function assetSrc(id) {
 const assetImg = (id, cls = "", attrs = "") => `<img class="${cls}" src="${assetSrc(id) || BLANK_IMG}" data-asset="${id}" alt="" ${attrs}>`;
 
 async function assetPut(data, id = "img" + uid()) {
+  if (!keepStorage.asked) { keepStorage.asked = true; keepStorage(); }
   await assetTx("readwrite", st => st.put(data, id));
   ASSET_IDS.add(id);
   if (!String(data).startsWith("data:")) return id; // a drawing, not a picture
@@ -133,26 +134,97 @@ function readImage(file, maxPx) {
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
       c.getContext("2d").drawImage(img, 0, 0, w, h);
-      let data = file.type === "image/png" ? c.toDataURL("image/png") : "";
-      if (!data || data.length > Math.max(400e3, maxPx * maxPx * 0.12)) data = c.toDataURL("image/jpeg", 0.85);
+      // a PNG stays a PNG only if it has see-through parts (a token, a stamp) and
+      // isn't huge; otherwise whichever is smaller, which for photos and
+      // screenshots is nearly always the JPEG
+      const jpeg = c.toDataURL("image/jpeg", 0.85);
+      let data = jpeg;
+      if (/png|webp|gif/.test(file.type)) {
+        const png = c.toDataURL("image/png"), px = c.getContext("2d").getImageData(0, 0, w, h).data;
+        let clear = false;
+        for (let i = 3; i < px.length; i += 4) if (px[i] < 250) { clear = true; break; }
+        if (clear ? png.length <= Math.max(400e3, maxPx * maxPx * 0.12) : png.length < jpeg.length) data = png;
+      }
       res({ data, w, h });
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("That file isn't an image this browser can read")); };
     img.src = url;
   });
 }
+/* ── adding a picture ── a small window that takes it however it comes:
+   pasted (Ctrl+V / ⌘V, or the Paste button), dropped onto it, or chosen
+   from a file. Every way goes through readImage, so a pasted screenshot is
+   shrunk just like a file would be. */
+// the image in a paste or drop, if there is one; else a picture's web address
+function clipImage(dt) {
+  for (const it of dt?.items || []) if (it.kind === "file" && it.type.startsWith("image/")) return { blob: it.getAsFile() };
+  for (const f of dt?.files || []) if (f.type.startsWith("image/")) return { blob: f };
+  const html = dt?.getData?.("text/html") || "", src = html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1];
+  const url = src || (dt?.getData?.("text/plain") || "").trim();
+  return /^(https?:|data:image\/)/.test(url) ? { url: url.replace(/&amp;/g, "&") } : null;
+}
+// a picture copied as a link: fetch it if the site allows it
+async function urlImage(url) {
+  const r = await fetch(url).catch(() => null);
+  const b = r?.ok ? await r.blob().catch(() => null) : null;
+  if (!b?.type.startsWith("image/")) throw new Error("That copied the picture's address, and its site won't let Moth fetch it. Right-click the picture and choose “Copy image” instead.");
+  return b;
+}
 function pickImage(maxPx) {
   return new Promise(res => {
-    const inp = document.createElement("input");
-    inp.type = "file"; inp.accept = "image/*";
-    inp.onchange = async () => {
-      const f = inp.files[0];
-      if (!f) return res(null);
+    let done = false, win = null;
+    const take = async got => {
+      if (done || !got) return;
       try {
-        const { data, w, h } = await readImage(f, maxPx);
+        const blob = got.blob || await urlImage(got.url);
+        done = true;
+        win?.close();
+        const { data, w, h } = await readImage(blob, maxPx);
         res({ id: await assetPut(data), w, h });
-      } catch (e) { toast(e.message); res(null); }
+      } catch (e) { done = false; toast(e.message); }
     };
-    inp.click();
+    const onPaste = e => { const got = clipImage(e.clipboardData); if (got) { e.preventDefault(); take(got); } else toast("There's no picture to paste. Copy one first (right-click it → Copy image), then paste."); };
+    win = modal({ title: "Add a picture",
+      body: `<div class="img-drop" tabindex="0" aria-label="Paste or drop a picture here">
+          <div class="img-drop-big">📋</div>
+          <b>Paste a picture: ${/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘V" : "Ctrl+V"}</b>
+          <span class="muted small">or drop one here. Copy it from anywhere first: a website (right-click → Copy image), a screenshot, another app.</span>
+        </div>
+        <div class="btn-row img-drop-btns">
+          ${navigator.clipboard?.read ? `<button class="btn accent" data-pb="paste">📋 Paste</button>` : ""}
+          <button class="btn" data-pb="file">📁 Choose a file…</button>
+        </div>`,
+      buttons: [{ label: "Cancel" }],
+      onClose: () => { document.removeEventListener("paste", onPaste); if (!done) res(null); },
+      onOpen: w => {
+        document.addEventListener("paste", onPaste);
+        const zone = w.querySelector(".img-drop");
+        zone.focus();
+        w.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("over"); });
+        w.addEventListener("dragleave", e => { if (!w.contains(e.relatedTarget)) zone.classList.remove("over"); });
+        w.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("over"); take(clipImage(e.dataTransfer)); });
+        w.addEventListener("click", async e => {
+          const b = e.target.closest("[data-pb]");
+          if (!b) return;
+          if (b.dataset.pb === "file") {
+            const inp = document.createElement("input");
+            inp.type = "file"; inp.accept = "image/*";
+            inp.onchange = () => inp.files[0] && take({ blob: inp.files[0] });
+            inp.click();
+            return;
+          }
+          // the Paste button: reads the clipboard (the browser may ask first)
+          try {
+            for (const it of await navigator.clipboard.read()) {
+              const t = it.types.find(x => x.startsWith("image/"));
+              if (t) return take({ blob: await it.getType(t) });
+            }
+            toast("There's no picture on the clipboard. Copy one first (right-click it → Copy image).");
+          } catch { toast("The browser didn't allow reading the clipboard. Press " + (/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘V" : "Ctrl+V") + " instead."); }
+        });
+      } });
   });
 }
+// Ask the browser to keep Moth's storage even when the disk gets full, so
+// hundreds of pictures aren't cleared away to make room. Asked once, quietly.
+function keepStorage() { try { navigator.storage?.persist?.().catch(() => {}); } catch {} }

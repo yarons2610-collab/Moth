@@ -978,3 +978,8 @@ details.field-ed > summary small { font-weight: 400; color: var(--ink-faint); ma
 .gbreak { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--ink-faint); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-top: 10px; }
 .gbreak.first { margin-top: 0; }
 .gbreak::after { content: ""; flex: 1; border-top: 1px solid var(--line2); }
+/* adding a picture: paste, drop or choose */
+.img-drop { border: 2px dashed var(--line2); border-radius: 14px; padding: 26px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; outline: none; }
+.img-drop:focus, .img-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.img-drop-big { font-size: 34px; }
+.img-drop-btns { justify-content: center; margin-top: 12px; }
